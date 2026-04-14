@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  doublink-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: doublink-api
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ../config:/opt/doublink/config:ro
+      - ../allure-results:/opt/doublink/allure-results
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HARMONY_API_KEY=${HARMONY_API_KEY:-}
+      - GRAFANA_API_KEY=${GRAFANA_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: doublink-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  pushgateway:
+    image: prom/pushgateway:v1.9.0
+    container_name: doublink-pushgateway
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: doublink-grafana
+    restart: unless-stopped
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+volumes:
+  prometheus-data:
+  grafana-data:

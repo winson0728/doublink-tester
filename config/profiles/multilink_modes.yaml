@@ -1,0 +1,18 @@
+modes:
+  - id: real_time
+    name: "Real-Time"
+    description: "Lowest latency, single best path"
+    mode_value: 0
+    parameters: {}
+
+  - id: bonding
+    name: "Bonding"
+    description: "Aggregate bandwidth across links"
+    mode_value: 3
+    parameters: {}
+
+  - id: duplicate
+    name: "Duplicate"
+    description: "Send packets on all links for redundancy"
+    mode_value: 4
+    parameters: {}

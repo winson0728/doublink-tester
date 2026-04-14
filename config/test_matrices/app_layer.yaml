@@ -1,0 +1,41 @@
+matrix:
+  - id: "http_clean_bonding"
+    mode: bonding
+    network_condition: clean
+    traffic: http_load
+    assertions:
+      min_qps: 100
+      min_success_rate: 0.99
+      max_latency_p95_ms: 200
+
+  - id: "grpc_clean_bonding"
+    mode: bonding
+    network_condition: clean
+    traffic: grpc_load
+    assertions:
+      min_qps: 50
+      min_success_rate: 0.99
+      max_latency_p95_ms: 300
+
+  - id: "sip_clean_realtime"
+    mode: real_time
+    network_condition: clean
+    traffic: sip_calls
+    assertions:
+      min_success_rate: 0.99
+
+  - id: "http_degraded_duplicate"
+    mode: duplicate
+    network_condition: moderate_loss
+    traffic: http_load
+    assertions:
+      min_qps: 50
+      min_success_rate: 0.90
+      max_latency_p95_ms: 1000
+
+  - id: "sip_disconnect_duplicate"
+    mode: duplicate
+    network_condition: intermittent_disconnect
+    traffic: sip_calls
+    assertions:
+      min_success_rate: 0.80

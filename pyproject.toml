@@ -1,0 +1,49 @@
+[project]
+name = "doublink-tester"
+version = "1.0.0"
+description = "Automated test framework for multilink system verification"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.30.0,<1.0.0",
+    "pydantic>=2.8.0,<3.0.0",
+    "httpx>=0.27.0,<1.0.0",
+    "pyyaml>=6.0",
+    "prometheus-client>=0.20.0",
+    "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-timeout>=2.3.0",
+    "allure-pytest>=2.13.0",
+    "ruff>=0.3.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m not slow')",
+    "mode_switching: mode switching tests",
+    "link_weight: link weight tests",
+    "degradation: network degradation tests",
+    "app_layer: application layer tests",
+    "integration: end-to-end integration tests",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120

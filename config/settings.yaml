@@ -1,0 +1,23 @@
+doublink:
+  netemu_url: "http://192.168.105.115:8080"
+  multilink_url: "http://192.168.101.100:30008"
+  multilink_agent_id: "100000018"
+  test_server: "192.168.105.103"
+  harmony_url: "https://10.22.101.191/api/v1"
+  harmony_api_key: "${HARMONY_API_KEY}"
+  prometheus_url: "http://localhost:9090"
+  grafana_url: "http://localhost:3000"
+  grafana_api_key: "${GRAFANA_API_KEY}"
+  api_host: "0.0.0.0"
+  api_port: 8090
+  results_dir: "./allure-results"
+
+  interfaces:
+    primary: "eth0"
+    secondary: "eth1"
+
+  timeouts:
+    traffic_start_s: 10
+    mode_switch_s: 15
+    network_settle_s: 5
+    metric_sample_interval_s: 2.0

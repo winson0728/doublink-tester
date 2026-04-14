@@ -1,0 +1,102 @@
+profiles:
+  - id: clean
+    name: "Clean Link"
+    description: "No impairment — baseline reference"
+    bandwidth_kbit: 0
+    delay_ms: 0
+    jitter_ms: 0
+    loss_pct: 0
+    direction: egress
+
+  - id: moderate_loss
+    name: "Moderate Packet Loss"
+    description: "Moderate loss scenario for resilience testing"
+    bandwidth_kbit: 100000
+    delay_ms: 20
+    jitter_ms: 5
+    loss_pct: 2.0
+    direction: both
+
+  - id: high_latency
+    name: "High Latency (Satellite-like)"
+    description: "Satellite-grade latency with moderate jitter"
+    bandwidth_kbit: 20000
+    delay_ms: 300
+    jitter_ms: 50
+    loss_pct: 0.5
+    direction: both
+
+  - id: asymmetric_degraded
+    name: "Asymmetric Degradation"
+    description: "Egress-only degradation with dynamic variation"
+    bandwidth_kbit: 5000
+    delay_ms: 80
+    jitter_ms: 40
+    loss_pct: 3.0
+    corrupt_pct: 0.1
+    direction: egress
+    variation:
+      delay_range_ms: 20
+      jitter_range_ms: 10
+      loss_range_pct: 1.0
+      bw_range_kbit: 2000
+      interval_s: 10
+
+  - id: intermittent_disconnect
+    name: "Intermittent Link Drops"
+    description: "Periodic disconnect cycling for failover testing"
+    bandwidth_kbit: 50000
+    delay_ms: 10
+    jitter_ms: 2
+    loss_pct: 0.1
+    direction: both
+    disconnect_schedule:
+      enabled: true
+      disconnect_s: 3.0
+      interval_s: 30.0
+      repeat: 5
+
+  - id: congested
+    name: "Severe Congestion"
+    description: "Heavy congestion with low bandwidth and high loss"
+    bandwidth_kbit: 1000
+    delay_ms: 200
+    jitter_ms: 100
+    loss_pct: 5.0
+    corrupt_pct: 0.5
+    duplicate_pct: 0.5
+    direction: both
+    variation:
+      delay_range_ms: 50
+      jitter_range_ms: 30
+      loss_range_pct: 2.0
+      bw_range_kbit: 500
+      interval_s: 5
+
+  - id: 4g_weak_signal
+    name: "4G Weak Signal"
+    description: "Poor LTE coverage — mirrors netemu 4g_weak preset"
+    bandwidth_kbit: 5000
+    delay_ms: 80
+    jitter_ms: 40
+    loss_pct: 3.0
+    corrupt_pct: 0.1
+    duplicate_pct: 0.1
+    disorder_pct: 5.0
+    direction: both
+
+  - id: wifi_interference
+    name: "WiFi with Interference"
+    description: "WiFi link under interference conditions"
+    bandwidth_kbit: 50000
+    delay_ms: 15
+    jitter_ms: 20
+    loss_pct: 1.5
+    corrupt_pct: 0.2
+    direction: both
+    variation:
+      delay_range_ms: 10
+      jitter_range_ms: 15
+      loss_range_pct: 1.0
+      bw_range_kbit: 20000
+      interval_s: 3

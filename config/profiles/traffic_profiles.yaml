@@ -1,0 +1,50 @@
+profiles:
+  - id: tcp_throughput
+    generator: iperf3
+    protocol: tcp
+    duration_s: 30
+    parameters:
+      parallel: 4
+      reverse: false
+
+  - id: udp_voip
+    generator: iperf3
+    protocol: udp
+    duration_s: 30
+    parameters:
+      bandwidth: "256K"
+      parallel: 1
+
+  - id: udp_throughput
+    generator: iperf3
+    protocol: udp
+    duration_s: 30
+    parameters:
+      bandwidth: "100M"
+      parallel: 2
+
+  - id: http_load
+    generator: fortio
+    protocol: http
+    duration_s: 30
+    parameters:
+      qps: 200
+      connections: 16
+
+  - id: grpc_load
+    generator: fortio
+    protocol: grpc
+    duration_s: 30
+    parameters:
+      qps: 100
+      connections: 8
+      payload_size: 1024
+
+  - id: sip_calls
+    generator: sipp
+    protocol: sip
+    duration_s: 60
+    parameters:
+      scenario: uac
+      calls_per_second: 2.0
+      max_calls: 20
