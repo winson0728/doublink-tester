@@ -36,8 +36,8 @@ class TimeoutSettings(BaseModel):
 
 
 class InterfaceSettings(BaseModel):
-    primary: str = "eth0"
-    secondary: str = "eth1"
+    primary: str = "wan_a_in"
+    secondary: str = "wan_b_in"
 
 
 class DoublinkSettings(BaseModel):

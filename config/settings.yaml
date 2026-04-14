@@ -14,8 +14,8 @@ doublink:
   results_dir: "./allure-results"
 
   interfaces:
-    primary: "eth0"
-    secondary: "eth1"
+    primary: "wan_a_in"
+    secondary: "wan_b_in"
 
   timeouts:
     traffic_start_s: 10
