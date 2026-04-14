@@ -22,16 +22,6 @@ pytest_plugins = [
 ]
 
 
-# Use a single event loop for the entire session so session-scoped async
-# fixtures don't hit "Event loop is closed" during teardown.
-@pytest.fixture(scope="session")
-def event_loop():
-    import asyncio
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 # ── Session-scoped: live for entire test run ───────────────────
 
 @pytest.fixture(scope="session")
