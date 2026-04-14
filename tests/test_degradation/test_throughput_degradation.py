@@ -1,6 +1,8 @@
-"""Network degradation tests — verify NetEmu integration and data plane impact."""
+"""Network degradation tests — verify data plane impact under various network conditions."""
 
 from __future__ import annotations
+
+import json
 
 import pytest
 import allure
@@ -102,3 +104,181 @@ class TestDisconnectSchedule:
         rule = await netemu_client.get_rule(rule_id)
         assert rule.get("disconnect_schedule") is not None
         assert rule["disconnect_schedule"]["enabled"] is True
+
+
+@allure.epic("Multilink Verification")
+@allure.feature("Network Degradation")
+class TestTcpThroughputDegradation:
+    """Measure TCP throughput under degraded network conditions."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.degradation
+    @pytest.mark.slow
+    @allure.story("TCP Throughput Under Degradation")
+    async def test_tcp_baseline_clean(self, iperf3_runner):
+        """Establish TCP throughput baseline with clean network."""
+        allure.dynamic.title("TCP baseline — clean network")
+
+        result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+
+        allure.attach(
+            json.dumps({"throughput_mbps": result.throughput_mbps, "loss_pct": result.loss_pct}, indent=2),
+            name="tcp_baseline.json",
+            attachment_type=allure.attachment_type.JSON,
+        )
+
+        assert result.throughput_mbps > 0, "No throughput measured"
+
+    @pytest.mark.asyncio
+    @pytest.mark.degradation
+    @pytest.mark.slow
+    @pytest.mark.parametrize("condition,min_throughput_mbps", [
+        ("moderate_loss", 1.0),
+        ("high_latency", 0.5),
+        ("congested", 0.1),
+        ("4g_weak_signal", 0.5),
+    ])
+    @allure.story("TCP Throughput Under Degradation")
+    async def test_tcp_under_degradation(
+        self,
+        condition: str,
+        min_throughput_mbps: float,
+        apply_network_condition,
+        iperf3_runner,
+        settings,
+    ):
+        """Verify TCP throughput stays above minimum under degraded conditions."""
+        allure.dynamic.title(f"TCP throughput — {condition}")
+
+        await apply_network_condition(condition, settings.interfaces.primary)
+
+        result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+
+        allure.attach(
+            json.dumps({
+                "condition": condition,
+                "throughput_mbps": result.throughput_mbps,
+                "loss_pct": result.loss_pct,
+                "min_required_mbps": min_throughput_mbps,
+            }, indent=2),
+            name=f"tcp_{condition}.json",
+            attachment_type=allure.attachment_type.JSON,
+        )
+
+        assert result.throughput_mbps >= min_throughput_mbps, (
+            f"TCP throughput {result.throughput_mbps:.2f} Mbps below minimum {min_throughput_mbps} Mbps"
+        )
+
+
+@allure.epic("Multilink Verification")
+@allure.feature("Network Degradation")
+class TestUdpDegradation:
+    """Measure UDP performance under degraded network conditions."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.degradation
+    @pytest.mark.slow
+    @allure.story("UDP Under Degradation")
+    async def test_udp_baseline_clean(self, iperf3_runner):
+        """Establish UDP baseline with clean network."""
+        allure.dynamic.title("UDP baseline — clean network")
+
+        result = await iperf3_runner(protocol="udp", duration_s=10, bandwidth="50M")
+
+        allure.attach(
+            json.dumps({
+                "throughput_mbps": result.throughput_mbps,
+                "loss_pct": result.loss_pct,
+                "jitter_ms": result.jitter_ms,
+            }, indent=2),
+            name="udp_baseline.json",
+            attachment_type=allure.attachment_type.JSON,
+        )
+
+        assert result.loss_pct < 5.0, f"UDP loss {result.loss_pct:.2f}% too high for clean network"
+
+    @pytest.mark.asyncio
+    @pytest.mark.degradation
+    @pytest.mark.slow
+    @pytest.mark.parametrize("condition,max_loss_pct,max_jitter_ms", [
+        ("moderate_loss", 50.0, 200.0),
+        ("high_latency", 20.0, 300.0),
+        ("wifi_interference", 30.0, 200.0),
+    ])
+    @allure.story("UDP Under Degradation")
+    async def test_udp_under_degradation(
+        self,
+        condition: str,
+        max_loss_pct: float,
+        max_jitter_ms: float,
+        apply_network_condition,
+        iperf3_runner,
+        settings,
+    ):
+        """Verify UDP loss and jitter stay within bounds under degraded conditions."""
+        allure.dynamic.title(f"UDP — {condition}")
+
+        await apply_network_condition(condition, settings.interfaces.primary)
+
+        result = await iperf3_runner(protocol="udp", duration_s=10, bandwidth="10M")
+
+        allure.attach(
+            json.dumps({
+                "condition": condition,
+                "throughput_mbps": result.throughput_mbps,
+                "loss_pct": result.loss_pct,
+                "jitter_ms": result.jitter_ms,
+            }, indent=2),
+            name=f"udp_{condition}.json",
+            attachment_type=allure.attachment_type.JSON,
+        )
+
+        assert result.loss_pct <= max_loss_pct, (
+            f"UDP loss {result.loss_pct:.2f}% exceeds maximum {max_loss_pct}%"
+        )
+
+
+@allure.epic("Multilink Verification")
+@allure.feature("Network Degradation")
+class TestRecoveryAfterDegradation:
+    """Verify throughput recovers after network degradation is removed."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.degradation
+    @pytest.mark.slow
+    @allure.story("Recovery After Degradation")
+    async def test_tcp_recovery_after_congestion(
+        self,
+        apply_network_condition,
+        netemu_client,
+        iperf3_runner,
+        settings,
+    ):
+        """Apply congestion, measure, clear, measure again — throughput should recover."""
+        allure.dynamic.title("TCP recovery after congestion")
+
+        # 1. Measure under congestion
+        rule_id = await apply_network_condition("congested", settings.interfaces.primary)
+        degraded = await iperf3_runner(protocol="tcp", duration_s=10)
+
+        # 2. Clear the rule
+        await netemu_client.clear_rule(rule_id)
+        import asyncio
+        await asyncio.sleep(settings.timeouts.network_settle_s)
+
+        # 3. Measure after recovery
+        recovered = await iperf3_runner(protocol="tcp", duration_s=10)
+
+        allure.attach(
+            json.dumps({
+                "degraded_mbps": degraded.throughput_mbps,
+                "recovered_mbps": recovered.throughput_mbps,
+            }, indent=2),
+            name="recovery.json",
+            attachment_type=allure.attachment_type.JSON,
+        )
+
+        assert recovered.throughput_mbps > degraded.throughput_mbps, (
+            f"Recovery throughput {recovered.throughput_mbps:.2f} Mbps should exceed "
+            f"degraded {degraded.throughput_mbps:.2f} Mbps"
+        )

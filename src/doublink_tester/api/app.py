@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from doublink_tester.api.dependencies import init_clients, shutdown_clients
-from doublink_tester.api.routers import health, profiles, modes
+from doublink_tester.api.routers import health, profiles, modes, traffic
 
 
 @asynccontextmanager
@@ -36,5 +36,6 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/health", tags=["health"])
     app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
     app.include_router(modes.router, prefix="/modes", tags=["modes"])
+    app.include_router(traffic.router, prefix="/traffic", tags=["traffic"])
 
     return app

@@ -18,6 +18,7 @@ from doublink_tester.clients.multilink_client import MultilinkClient
 pytest_plugins = [
     "tests.fixtures.network",
     "tests.fixtures.multilink",
+    "tests.fixtures.traffic",
 ]
 
 

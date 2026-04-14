@@ -45,6 +45,7 @@ class DoublinkSettings(BaseModel):
     multilink_url: str = "http://192.168.101.100:30008"
     multilink_agent_id: str = "100000018"
     test_server: str = "192.168.105.103"
+    iperf3_server: str = "192.168.101.101"
     harmony_url: str = "https://10.22.101.191/api/v1"
     harmony_api_key: str = ""
     prometheus_url: str = "http://localhost:9090"

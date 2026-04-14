@@ -3,6 +3,7 @@ doublink:
   multilink_url: "http://192.168.101.100:30008"
   multilink_agent_id: "100000018"
   test_server: "192.168.105.103"
+  iperf3_server: "192.168.101.101"
   harmony_url: "https://10.22.101.191/api/v1"
   harmony_api_key: "${HARMONY_API_KEY}"
   prometheus_url: "http://localhost:9090"
