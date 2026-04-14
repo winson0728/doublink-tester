@@ -54,7 +54,10 @@ class MultilinkClient:
 
     async def __aexit__(self, *args: Any) -> None:
         if self._http:
-            await self._http.aclose()
+            try:
+                await self._http.aclose()
+            except RuntimeError:
+                pass  # event loop already closed during session teardown
             self._http = None
 
     @property
