@@ -24,7 +24,7 @@ class NetEmuClient:
         self._http: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> NetEmuClient:
-        self._http = httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout)
+        self._http = httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout, follow_redirects=True)
         return self
 
     async def __aexit__(self, *args: Any) -> None:
