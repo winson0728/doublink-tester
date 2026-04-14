@@ -7,7 +7,7 @@ import asyncio
 import pytest_asyncio
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def apply_network_condition(netemu_client, network_profiles, settings):
     """Factory fixture: apply a network condition profile and auto-clear on teardown.
 
@@ -41,7 +41,7 @@ async def apply_network_condition(netemu_client, network_profiles, settings):
             pass  # Best-effort cleanup
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def clean_network(netemu_client):
     """Ensure a clean network state before and after test — clears all active rules."""
     rules = await netemu_client.list_rules()

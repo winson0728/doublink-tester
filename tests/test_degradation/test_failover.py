@@ -8,13 +8,14 @@ import json
 import pytest
 import allure
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 
 @allure.epic("Multilink Verification")
 @allure.feature("Failover")
 class TestLinkFailover:
     """Verify multilink failover when a link is disconnected."""
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("mode", ["bonding", "duplicate"])
@@ -63,7 +64,6 @@ class TestLinkFailover:
         # Traffic should continue during failover (at reduced rate)
         assert during.throughput_mbps > 0, "Zero throughput during failover"
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.slow
     @allure.story("Scheduled Disconnect")

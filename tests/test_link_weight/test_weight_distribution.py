@@ -9,6 +9,8 @@ import allure
 
 from doublink_tester.config import load_test_matrix
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 _matrix = load_test_matrix("link_weight")
 _params = [
     pytest.param(
@@ -27,7 +29,6 @@ _params = [
 class TestModeComparison:
     """Compare throughput and loss across different multilink modes."""
 
-    @pytest.mark.asyncio
     @pytest.mark.link_weight
     @pytest.mark.slow
     @pytest.mark.parametrize(
@@ -101,7 +102,6 @@ class TestModeComparison:
 class TestModeBaselineComparison:
     """Compare clean-network throughput across all modes."""
 
-    @pytest.mark.asyncio
     @pytest.mark.link_weight
     @pytest.mark.slow
     @allure.story("Baseline Mode Comparison")
@@ -127,7 +127,6 @@ class TestModeBaselineComparison:
         for mode, mbps in results.items():
             assert mbps > 0, f"Mode {mode} produced zero throughput"
 
-    @pytest.mark.asyncio
     @pytest.mark.link_weight
     @pytest.mark.slow
     @allure.story("Baseline Mode Comparison")

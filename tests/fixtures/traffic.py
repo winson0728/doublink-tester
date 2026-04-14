@@ -15,7 +15,7 @@ from doublink_tester.traffic.factory import from_profile
 logger = logging.getLogger(__name__)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def iperf3_runner(settings):
     """Factory fixture: run iperf3 tests against the configured server.
 
@@ -60,7 +60,7 @@ async def iperf3_runner(settings):
                 logger.warning("Failed to stop iperf3 generator during teardown")
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def traffic_runner(settings, traffic_profiles):
     """Factory fixture: run traffic from a named profile.
 

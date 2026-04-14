@@ -8,6 +8,8 @@ import json
 import pytest
 import allure
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 from doublink_tester.config import load_test_matrix
 
 
@@ -30,7 +32,6 @@ _transition_params = [
 class TestModeTransitions:
     """Verify traffic continuity during multilink mode transitions."""
 
-    @pytest.mark.asyncio
     @pytest.mark.mode_switching
     @pytest.mark.parametrize(
         "from_mode, to_mode, net_condition, traffic_profile, assertions",
@@ -100,7 +101,6 @@ class TestModeTransitions:
 class TestModeBasicSwitch:
     """Verify basic mode switching without traffic (quick validation)."""
 
-    @pytest.mark.asyncio
     @pytest.mark.mode_switching
     @pytest.mark.parametrize("from_mode,to_mode", [
         ("bonding", "duplicate"),
@@ -132,7 +132,6 @@ class TestModeBasicSwitch:
 class TestModeSwitchUnderLoad:
     """Verify mode switching while iperf3 traffic is actively flowing."""
 
-    @pytest.mark.asyncio
     @pytest.mark.mode_switching
     @pytest.mark.slow
     @allure.story("Switch Under Active Load")

@@ -9,7 +9,7 @@ import pytest_asyncio
 logger = logging.getLogger(__name__)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def set_multilink_mode(multilink_client, multilink_modes):
     """Factory fixture: set a multilink mode and restore the original on teardown.
 

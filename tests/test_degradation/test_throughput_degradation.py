@@ -7,13 +7,14 @@ import json
 import pytest
 import allure
 
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 
 @allure.epic("Multilink Verification")
 @allure.feature("Network Degradation")
 class TestNetworkConditionApplied:
     """Verify that network conditions are correctly applied via NetEmu."""
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.parametrize("condition", [
         "clean",
@@ -43,7 +44,6 @@ class TestNetworkConditionApplied:
             f"Rule status is {active[0]['status']}, expected active"
         )
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @allure.story("Apply and Clear Network Condition")
     async def test_condition_clear_restores_clean(
@@ -67,7 +67,6 @@ class TestNetworkConditionApplied:
 class TestDegradationWithVariation:
     """Verify network conditions with dynamic variation."""
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @allure.story("Dynamic Variation")
     async def test_asymmetric_variation_applied(
@@ -89,7 +88,6 @@ class TestDegradationWithVariation:
 class TestDisconnectSchedule:
     """Verify intermittent disconnect functionality."""
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @allure.story("Intermittent Disconnect")
     async def test_disconnect_schedule_applied(
@@ -111,7 +109,6 @@ class TestDisconnectSchedule:
 class TestTcpThroughputDegradation:
     """Measure TCP throughput under degraded network conditions."""
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.slow
     @allure.story("TCP Throughput Under Degradation")
@@ -129,7 +126,6 @@ class TestTcpThroughputDegradation:
 
         assert result.throughput_mbps > 0, "No throughput measured"
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("condition,min_throughput_mbps", [
@@ -175,7 +171,6 @@ class TestTcpThroughputDegradation:
 class TestUdpDegradation:
     """Measure UDP performance under degraded network conditions."""
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.slow
     @allure.story("UDP Under Degradation")
@@ -197,7 +192,6 @@ class TestUdpDegradation:
 
         assert result.loss_pct < 5.0, f"UDP loss {result.loss_pct:.2f}% too high for clean network"
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("condition,max_loss_pct,max_jitter_ms", [
@@ -243,7 +237,6 @@ class TestUdpDegradation:
 class TestRecoveryAfterDegradation:
     """Verify throughput recovers after network degradation is removed."""
 
-    @pytest.mark.asyncio
     @pytest.mark.degradation
     @pytest.mark.slow
     @allure.story("Recovery After Degradation")
