@@ -48,14 +48,14 @@ def traffic_profiles():
     return {t.id: t for t in load_traffic_profiles()}
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def netemu_client(settings):
     """Async NetEmu client — opened once, shared across all tests."""
     async with NetEmuClient(settings.netemu_url) as client:
         yield client
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def multilink_client(settings):
     """Async Multilink client — opened once, shared across all tests."""
     async with MultilinkClient(settings.multilink_url, agent_id=settings.multilink_agent_id) as client:
