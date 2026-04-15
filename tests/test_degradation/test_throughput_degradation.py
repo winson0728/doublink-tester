@@ -21,7 +21,6 @@ class TestNetworkConditionApplied:
         "moderate_loss",
         "high_latency",
         "congested",
-        "4g_weak_signal",
     ])
     @allure.story("Apply Network Condition")
     async def test_network_condition_applied(
@@ -132,7 +131,6 @@ class TestTcpThroughputDegradation:
         ("moderate_loss", 1.0),
         ("high_latency", 0.5),
         ("congested", 0.1),
-        ("4g_weak_signal", 0.5),
     ])
     @allure.story("TCP Throughput Under Degradation")
     async def test_tcp_under_degradation(

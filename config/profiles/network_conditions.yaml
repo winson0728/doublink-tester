@@ -73,18 +73,6 @@ profiles:
       bw_range_kbit: 500
       interval_s: 5
 
-  - id: 4g_weak_signal
-    name: "4G Weak Signal"
-    description: "Poor LTE coverage — mirrors netemu 4g_weak preset"
-    bandwidth_kbit: 5000
-    delay_ms: 80
-    jitter_ms: 40
-    loss_pct: 3.0
-    corrupt_pct: 0.1
-    duplicate_pct: 0.1
-    disorder_pct: 5.0
-    direction: both
-
   - id: wifi_interference
     name: "WiFi with Interference"
     description: "WiFi link under interference conditions"

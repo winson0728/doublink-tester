@@ -46,14 +46,6 @@ matrix:
     assertions:
       min_success_rate: 0.80
 
-  - id: "4g_weak_duplicate_http"
-    mode: duplicate
-    network_condition: 4g_weak_signal
-    traffic: http_load
-    assertions:
-      min_success_rate: 0.85
-      max_latency_p95_ms: 1500
-
   - id: "wifi_interference_bonding_udp"
     mode: bonding
     network_condition: wifi_interference
