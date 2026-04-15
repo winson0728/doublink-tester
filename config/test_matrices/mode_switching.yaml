@@ -15,6 +15,7 @@ matrix:
     traffic: http_load
     assertions:
       max_traffic_interruption_s: 5.0
+      min_throughput_recovery_pct: 30
       min_success_rate: 0.95
 
   - id: "duplicate_to_realtime_symm_latency_tcp"
