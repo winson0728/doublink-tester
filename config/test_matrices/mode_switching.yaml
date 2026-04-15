@@ -34,6 +34,7 @@ matrix:
     traffic: udp_voip
     assertions:
       max_traffic_interruption_s: 3.0
+      min_throughput_recovery_pct: 20
       min_success_rate: 0.90
 
   - id: "bonding_to_realtime_5g_intermittent_sip"
