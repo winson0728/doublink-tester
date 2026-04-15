@@ -49,6 +49,14 @@ async def apply_network_condition(netemu_client, network_profiles, settings):
                 f"Available: {list(network_profiles.keys())}"
             )
 
+        # Clear any previously-created rules before applying new profile
+        for old_id in list(created_rule_ids):
+            try:
+                await netemu_client.clear_rule(old_id)
+            except Exception:
+                pass
+        created_rule_ids.clear()
+
         profile = network_profiles[profile_id]
         interfaces = _interfaces_dict(settings)
         rule_params_list = profile.get_rule_params(interfaces)
