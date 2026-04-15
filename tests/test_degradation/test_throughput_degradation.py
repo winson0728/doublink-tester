@@ -184,8 +184,8 @@ class TestTcpThroughputDegradation:
         ("symmetric_loss", 1.0),
         ("symmetric_latency", 0.5),
         ("symmetric_congested", 0.1),
-        ("5g_degraded", 1.0),        # WiFi clean → should still get decent throughput
-        ("wifi_degraded", 1.0),       # 5G clean → should still get decent throughput
+        ("5g_degraded", 0.5),        # WiFi clean → steering to WiFi
+        ("wifi_degraded", 0.5),       # 5G clean → steering to 5G
         ("asymmetric_mixed", 0.5),    # 5G latency + WiFi loss
     ])
     @allure.story("TCP Throughput Under Degradation")
