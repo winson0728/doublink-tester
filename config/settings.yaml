@@ -14,8 +14,10 @@ doublink:
   results_dir: "./allure-results"
 
   interfaces:
-    primary: "wan_a_in"
-    secondary: "wan_b_in"
+    line_a_dl: "wan_a_in"      # LINE A Downlink (5G DL)
+    line_a_ul: "lan_a_out"     # LINE A Uplink   (5G UL)
+    line_b_dl: "wan_b_in"      # LINE B Downlink (WiFi DL)
+    line_b_ul: "lan_b_out"     # LINE B Uplink   (WiFi UL)
 
   timeouts:
     traffic_start_s: 10

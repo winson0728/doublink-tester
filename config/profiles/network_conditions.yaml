@@ -1,90 +1,260 @@
+# ────────────────────────────────────────────────────────────────
+# Network Condition Profiles for ATSSS (5G + WiFi) Testing
+# ────────────────────────────────────────────────────────────────
+#
+# Topology (NetEmu bridge mode, all rules use egress):
+#
+#   Internet ←─ wan_a_in ─bridge─ lan_a_out ─→ Multilink (LINE A / 5G)
+#   Internet ←─ wan_b_in ─bridge─ lan_b_out ─→ Multilink (LINE B / WiFi)
+#
+#   wan_a_in  egress = LINE A DL    lan_a_out egress = LINE A UL
+#   wan_b_in  egress = LINE B DL    lan_b_out egress = LINE B UL
+#
+# Each profile specifies line_a (5G) and line_b (WiFi) independently.
+# Omit a line or set all params to 0 = clean (no rule created).
+# ────────────────────────────────────────────────────────────────
+
 profiles:
+
+  # ── Baseline ─────────────────────────────────────────────────
+
   - id: clean
-    name: "Clean Link"
-    description: "No impairment — baseline reference"
-    bandwidth_kbit: 0
-    delay_ms: 0
-    jitter_ms: 0
-    loss_pct: 0
-    direction: egress
+    name: "Clean — Baseline"
+    description: "Both lines clean, no impairment"
+    line_a:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
+    line_b:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
 
-  - id: moderate_loss
-    name: "Moderate Packet Loss"
-    description: "Moderate loss scenario for resilience testing"
-    bandwidth_kbit: 100000
-    delay_ms: 20
-    jitter_ms: 5
-    loss_pct: 2.0
-    direction: both
+  # ── Symmetric (both lines same condition) ────────────────────
 
-  - id: high_latency
-    name: "High Latency (Satellite-like)"
-    description: "Satellite-grade latency with moderate jitter"
-    bandwidth_kbit: 20000
-    delay_ms: 300
-    jitter_ms: 50
-    loss_pct: 0.5
-    direction: both
+  - id: symmetric_loss
+    name: "Symmetric — Moderate Loss"
+    description: "Both 5G and WiFi with moderate loss, test splitting resilience"
+    line_a:
+      bandwidth_kbit: 100000
+      delay_ms: 20
+      jitter_ms: 5
+      loss_pct: 2.0
+    line_b:
+      bandwidth_kbit: 100000
+      delay_ms: 20
+      jitter_ms: 5
+      loss_pct: 2.0
 
-  - id: asymmetric_degraded
-    name: "Asymmetric Degradation"
-    description: "Egress-only degradation with dynamic variation"
-    bandwidth_kbit: 5000
-    delay_ms: 80
-    jitter_ms: 40
-    loss_pct: 3.0
-    corrupt_pct: 0.1
-    direction: egress
-    variation:
-      delay_range_ms: 20
-      jitter_range_ms: 10
-      loss_range_pct: 1.0
-      bw_range_kbit: 2000
-      interval_s: 10
+  - id: symmetric_latency
+    name: "Symmetric — High Latency"
+    description: "Both lines with high latency, test bonding/splitting under delay"
+    line_a:
+      bandwidth_kbit: 20000
+      delay_ms: 200
+      jitter_ms: 30
+      loss_pct: 0.5
+    line_b:
+      bandwidth_kbit: 20000
+      delay_ms: 200
+      jitter_ms: 30
+      loss_pct: 0.5
 
-  - id: intermittent_disconnect
-    name: "Intermittent Link Drops"
-    description: "Periodic disconnect cycling for failover testing"
-    bandwidth_kbit: 50000
-    delay_ms: 10
-    jitter_ms: 2
-    loss_pct: 0.1
-    direction: both
-    disconnect_schedule:
-      enabled: true
-      disconnect_s: 3.0
-      interval_s: 30.0
-      repeat: 5
+  - id: symmetric_congested
+    name: "Symmetric — Congested"
+    description: "Both lines severely congested, test minimum throughput"
+    line_a:
+      bandwidth_kbit: 1000
+      delay_ms: 200
+      jitter_ms: 100
+      loss_pct: 5.0
+      corrupt_pct: 0.5
+    line_b:
+      bandwidth_kbit: 1000
+      delay_ms: 200
+      jitter_ms: 100
+      loss_pct: 5.0
+      corrupt_pct: 0.5
 
-  - id: congested
-    name: "Severe Congestion"
-    description: "Heavy congestion with low bandwidth and high loss"
-    bandwidth_kbit: 1000
-    delay_ms: 200
-    jitter_ms: 100
-    loss_pct: 5.0
-    corrupt_pct: 0.5
-    duplicate_pct: 0.5
-    direction: both
-    variation:
-      delay_range_ms: 50
-      jitter_range_ms: 30
-      loss_range_pct: 2.0
-      bw_range_kbit: 500
-      interval_s: 5
+  # ── Asymmetric — Steering tests ──────────────────────────────
+
+  - id: 5g_degraded
+    name: "5G Degraded, WiFi Clean"
+    description: "LINE A (5G) with high loss, LINE B (WiFi) clean — test steering to WiFi"
+    line_a:
+      bandwidth_kbit: 5000
+      delay_ms: 80
+      jitter_ms: 40
+      loss_pct: 5.0
+      corrupt_pct: 0.2
+    line_b:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
+
+  - id: wifi_degraded
+    name: "WiFi Degraded, 5G Clean"
+    description: "LINE B (WiFi) with high loss, LINE A (5G) clean — test steering to 5G"
+    line_a:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
+    line_b:
+      bandwidth_kbit: 5000
+      delay_ms: 80
+      jitter_ms: 40
+      loss_pct: 5.0
+      corrupt_pct: 0.2
+
+  - id: 5g_high_latency
+    name: "5G High Latency, WiFi Normal"
+    description: "LINE A (5G) satellite-like delay, LINE B (WiFi) normal — test latency-aware steering"
+    line_a:
+      bandwidth_kbit: 20000
+      delay_ms: 300
+      jitter_ms: 50
+      loss_pct: 0.5
+    line_b:
+      bandwidth_kbit: 100000
+      delay_ms: 5
+      jitter_ms: 2
+      loss_pct: 0
+
+  - id: wifi_high_latency
+    name: "WiFi High Latency, 5G Normal"
+    description: "LINE B (WiFi) high delay, LINE A (5G) normal — test latency-aware steering"
+    line_a:
+      bandwidth_kbit: 100000
+      delay_ms: 5
+      jitter_ms: 2
+      loss_pct: 0
+    line_b:
+      bandwidth_kbit: 20000
+      delay_ms: 300
+      jitter_ms: 50
+      loss_pct: 0.5
+
+  - id: asymmetric_mixed
+    name: "Asymmetric — 5G Latency + WiFi Loss"
+    description: "LINE A high latency, LINE B high loss — test ATSSS steering decision"
+    line_a:
+      bandwidth_kbit: 20000
+      delay_ms: 200
+      jitter_ms: 40
+      loss_pct: 0.5
+    line_b:
+      bandwidth_kbit: 50000
+      delay_ms: 10
+      jitter_ms: 5
+      loss_pct: 5.0
+
+  # ── Switching — Disconnect tests ─────────────────────────────
+
+  - id: 5g_disconnect
+    name: "5G Disconnect (LINE A Down)"
+    description: "LINE A completely offline — test switching to WiFi only"
+    line_a:
+      bandwidth_kbit: 1
+      delay_ms: 0
+      loss_pct: 100.0
+    line_b:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
+
+  - id: wifi_disconnect
+    name: "WiFi Disconnect (LINE B Down)"
+    description: "LINE B completely offline — test switching to 5G only"
+    line_a:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
+    line_b:
+      bandwidth_kbit: 1
+      delay_ms: 0
+      loss_pct: 100.0
+
+  - id: 5g_intermittent
+    name: "5G Intermittent Disconnect"
+    description: "LINE A periodic disconnects, LINE B stable — test switch/split resilience"
+    line_a:
+      bandwidth_kbit: 50000
+      delay_ms: 10
+      jitter_ms: 2
+      loss_pct: 0.1
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 3.0
+        interval_s: 30.0
+        repeat: 5
+    line_b:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
+
+  - id: wifi_intermittent
+    name: "WiFi Intermittent Disconnect"
+    description: "LINE B periodic disconnects, LINE A stable — test switch/split resilience"
+    line_a:
+      bandwidth_kbit: 0
+      delay_ms: 0
+      loss_pct: 0
+    line_b:
+      bandwidth_kbit: 50000
+      delay_ms: 10
+      jitter_ms: 2
+      loss_pct: 0.1
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 3.0
+        interval_s: 30.0
+        repeat: 5
+
+  # ── Dynamic Variation ────────────────────────────────────────
 
   - id: wifi_interference
-    name: "WiFi with Interference"
-    description: "WiFi link under interference conditions"
-    bandwidth_kbit: 50000
-    delay_ms: 15
-    jitter_ms: 20
-    loss_pct: 1.5
-    corrupt_pct: 0.2
-    direction: both
-    variation:
-      delay_range_ms: 10
-      jitter_range_ms: 15
-      loss_range_pct: 1.0
-      bw_range_kbit: 20000
-      interval_s: 3
+    name: "WiFi Interference (Dynamic)"
+    description: "LINE B fluctuating quality, LINE A stable — test adaptive steering"
+    line_a:
+      bandwidth_kbit: 100000
+      delay_ms: 5
+      jitter_ms: 2
+      loss_pct: 0
+    line_b:
+      bandwidth_kbit: 50000
+      delay_ms: 15
+      jitter_ms: 20
+      loss_pct: 1.5
+      corrupt_pct: 0.2
+      variation:
+        delay_range_ms: 10
+        jitter_range_ms: 15
+        loss_range_pct: 1.0
+        bw_range_kbit: 20000
+        interval_s: 3
+
+  - id: both_varied
+    name: "Both Lines Dynamic Variation"
+    description: "Both lines fluctuating independently — stress test ATSSS splitting"
+    line_a:
+      bandwidth_kbit: 50000
+      delay_ms: 30
+      jitter_ms: 15
+      loss_pct: 1.0
+      variation:
+        delay_range_ms: 20
+        jitter_range_ms: 10
+        loss_range_pct: 1.0
+        bw_range_kbit: 20000
+        interval_s: 5
+    line_b:
+      bandwidth_kbit: 30000
+      delay_ms: 20
+      jitter_ms: 10
+      loss_pct: 2.0
+      variation:
+        delay_range_ms: 15
+        jitter_range_ms: 10
+        loss_range_pct: 1.5
+        bw_range_kbit: 15000
+        interval_s: 3

@@ -24,18 +24,27 @@ matrix:
     assertions:
       min_success_rate: 0.99
 
-  - id: "http_degraded_duplicate"
+  - id: "http_symmetric_loss_duplicate"
     mode: duplicate
-    network_condition: moderate_loss
+    network_condition: symmetric_loss
     traffic: http_load
     assertions:
       min_qps: 50
       min_success_rate: 0.90
       max_latency_p95_ms: 1000
 
-  - id: "sip_disconnect_duplicate"
+  - id: "sip_5g_intermittent_duplicate"
     mode: duplicate
-    network_condition: intermittent_disconnect
+    network_condition: 5g_intermittent
     traffic: sip_calls
     assertions:
       min_success_rate: 0.80
+
+  - id: "http_asymmetric_mixed_bonding"
+    mode: bonding
+    network_condition: asymmetric_mixed
+    traffic: http_load
+    assertions:
+      min_qps: 30
+      min_success_rate: 0.85
+      max_latency_p95_ms: 1500

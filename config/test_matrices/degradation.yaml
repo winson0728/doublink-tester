@@ -1,47 +1,47 @@
 matrix:
-  - id: "loss_bonding_tcp"
+  - id: "symmetric_loss_bonding_tcp"
     mode: bonding
-    network_condition: moderate_loss
+    network_condition: symmetric_loss
     traffic: tcp_throughput
     assertions:
       min_throughput_mbps: 1.0
       max_loss_pct: 50.0
 
-  - id: "loss_duplicate_tcp"
+  - id: "symmetric_loss_duplicate_tcp"
     mode: duplicate
-    network_condition: moderate_loss
+    network_condition: symmetric_loss
     traffic: tcp_throughput
     assertions:
       min_throughput_mbps: 1.0
       max_loss_pct: 50.0
 
-  - id: "latency_realtime_http"
+  - id: "symmetric_latency_realtime_http"
     mode: real_time
-    network_condition: high_latency
+    network_condition: symmetric_latency
     traffic: http_load
     assertions:
       min_success_rate: 0.90
       max_latency_p95_ms: 2000
 
-  - id: "latency_bonding_http"
+  - id: "symmetric_latency_bonding_http"
     mode: bonding
-    network_condition: high_latency
+    network_condition: symmetric_latency
     traffic: http_load
     assertions:
       min_success_rate: 0.90
       max_latency_p95_ms: 2000
 
-  - id: "congested_bonding_tcp"
+  - id: "symmetric_congested_bonding_tcp"
     mode: bonding
-    network_condition: congested
+    network_condition: symmetric_congested
     traffic: tcp_throughput
     assertions:
       min_throughput_mbps: 0.1
       max_loss_pct: 80.0
 
-  - id: "disconnect_realtime_sip"
+  - id: "5g_disconnect_realtime_sip"
     mode: real_time
-    network_condition: intermittent_disconnect
+    network_condition: 5g_disconnect
     traffic: sip_calls
     assertions:
       min_success_rate: 0.80
@@ -53,3 +53,33 @@ matrix:
     assertions:
       min_success_rate: 0.80
       max_jitter_ms: 100
+
+  # ── ATSSS Steering tests ──────────────────────────
+  - id: "5g_degraded_bonding_tcp"
+    mode: bonding
+    network_condition: 5g_degraded
+    traffic: tcp_throughput
+    assertions:
+      min_throughput_mbps: 1.0
+
+  - id: "wifi_degraded_bonding_tcp"
+    mode: bonding
+    network_condition: wifi_degraded
+    traffic: tcp_throughput
+    assertions:
+      min_throughput_mbps: 1.0
+
+  - id: "asymmetric_mixed_duplicate_tcp"
+    mode: duplicate
+    network_condition: asymmetric_mixed
+    traffic: tcp_throughput
+    assertions:
+      min_throughput_mbps: 0.5
+      max_loss_pct: 60.0
+
+  - id: "wifi_disconnect_duplicate_sip"
+    mode: duplicate
+    network_condition: wifi_disconnect
+    traffic: sip_calls
+    assertions:
+      min_success_rate: 0.80

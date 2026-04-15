@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from doublink_tester.models import (
     DisconnectScheduleConfig,
+    LineRuleConfig,
     MultilinkModeConfig,
     NetworkConditionProfile,
     TrafficProfile,
@@ -36,8 +37,10 @@ class TimeoutSettings(BaseModel):
 
 
 class InterfaceSettings(BaseModel):
-    primary: str = "wan_a_in"
-    secondary: str = "wan_b_in"
+    line_a_dl: str = "wan_a_in"     # LINE A Downlink (5G DL)
+    line_a_ul: str = "lan_a_out"    # LINE A Uplink   (5G UL)
+    line_b_dl: str = "wan_b_in"     # LINE B Downlink (WiFi DL)
+    line_b_ul: str = "lan_b_out"    # LINE B Uplink   (WiFi UL)
 
 
 class DoublinkSettings(BaseModel):
@@ -89,15 +92,23 @@ def _parse_disconnect_schedule(raw: dict[str, Any] | None) -> DisconnectSchedule
     return DisconnectScheduleConfig(**raw)
 
 
+def _parse_line_rule(raw: dict[str, Any] | None) -> LineRuleConfig | None:
+    if raw is None:
+        return None
+    variation = _parse_variation(raw.pop("variation", None))
+    disconnect = _parse_disconnect_schedule(raw.pop("disconnect_schedule", None))
+    return LineRuleConfig(**raw, variation=variation, disconnect_schedule=disconnect)
+
+
 def load_network_profiles(config_dir: str | Path | None = None) -> list[NetworkConditionProfile]:
     """Load network condition profiles from config/profiles/network_conditions.yaml."""
     config_path = Path(config_dir) if config_dir else _DEFAULT_CONFIG_DIR
     data = _load_yaml(config_path / "profiles" / "network_conditions.yaml")
     profiles = []
     for entry in data.get("profiles", []):
-        variation = _parse_variation(entry.pop("variation", None))
-        disconnect = _parse_disconnect_schedule(entry.pop("disconnect_schedule", None))
-        profiles.append(NetworkConditionProfile(**entry, variation=variation, disconnect_schedule=disconnect))
+        line_a = _parse_line_rule(entry.pop("line_a", None))
+        line_b = _parse_line_rule(entry.pop("line_b", None))
+        profiles.append(NetworkConditionProfile(**entry, line_a=line_a, line_b=line_b))
     return profiles
 
 

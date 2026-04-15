@@ -9,14 +9,13 @@ from typing import Any
 
 from doublink_tester.clients.multilink_client import MultilinkClient
 from doublink_tester.clients.netemu_client import NetEmuClient
-from doublink_tester.config import load_network_profiles
+from doublink_tester.config import load_network_profiles, load_settings, load_traffic_profiles
 from doublink_tester.metrics.annotator import GrafanaAnnotator
 from doublink_tester.metrics.sampler import MetricSampler
 from doublink_tester.models import TestVerdict
 from doublink_tester.orchestrator.result import TestRunResult
 from doublink_tester.orchestrator.scenario import TestScenario
 from doublink_tester.traffic.factory import from_profile as traffic_from_profile
-from doublink_tester.config import load_traffic_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class TestRunOrchestrator:
         Flow:
         1. Annotate test start in Grafana
         2. Set multilink mode
-        3. Apply network condition via NetEmu
+        3. Apply dual-line network condition via NetEmu (up to 4 rules)
         4. Start metric sampler
         5. Run traffic generator
         6. Collect results
@@ -50,7 +49,7 @@ class TestRunOrchestrator:
         8. Annotate test end
         """
         result = TestRunResult(scenario_name=scenario.name, started_at=time.time())
-        rule_id: str | None = None
+        rule_ids: list[str] = []
 
         try:
             # 1. Annotate start
@@ -66,13 +65,22 @@ class TestRunOrchestrator:
             except NotImplementedError:
                 logger.warning("Multilink mode setting skipped — API not implemented")
 
-            # 3. Apply network condition
+            # 3. Apply dual-line network condition
             profiles = {p.id: p for p in load_network_profiles()}
             if scenario.network_condition in profiles:
                 profile = profiles[scenario.network_condition]
-                params = profile.to_rule_params(scenario.interface)
-                rule_result = await self._netemu.create_rule(params)
-                rule_id = rule_result.get("rule", {}).get("id")
+                settings = load_settings()
+                interfaces = {
+                    "line_a_dl": settings.interfaces.line_a_dl,
+                    "line_a_ul": settings.interfaces.line_a_ul,
+                    "line_b_dl": settings.interfaces.line_b_dl,
+                    "line_b_ul": settings.interfaces.line_b_ul,
+                }
+                for params in profile.get_rule_params(interfaces):
+                    rule_result = await self._netemu.create_rule(params)
+                    rid = rule_result.get("rule", {}).get("id")
+                    if rid:
+                        rule_ids.append(rid)
                 await asyncio.sleep(scenario.settle_time_s)
 
             # 4. Start metric sampler
@@ -102,10 +110,10 @@ class TestRunOrchestrator:
             result.errors.append(str(e))
             result.verdict = TestVerdict.FAIL
         finally:
-            # 8. Cleanup: clear network condition
-            if rule_id:
+            # 8. Cleanup: clear all network condition rules
+            for rid in rule_ids:
                 try:
-                    await self._netemu.clear_rule(rule_id)
+                    await self._netemu.clear_rule(rid)
                 except Exception:
                     pass
 

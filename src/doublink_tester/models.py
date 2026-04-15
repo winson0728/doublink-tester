@@ -94,12 +94,9 @@ class RuleCreateParams:
 
 
 @dataclass
-class NetworkConditionProfile:
-    """A named network condition profile, loaded from YAML config."""
+class LineRuleConfig:
+    """Degradation parameters for a single line (DL + UL share same params)."""
 
-    id: str
-    name: str
-    description: str = ""
     bandwidth_kbit: int = 0
     delay_ms: float = 0
     jitter_ms: float = 0
@@ -107,15 +104,14 @@ class NetworkConditionProfile:
     corrupt_pct: float = 0
     duplicate_pct: float = 0
     disorder_pct: float = 0
-    direction: str = "egress"
     variation: VariationConfig | None = None
     disconnect_schedule: DisconnectScheduleConfig | None = None
 
-    def to_rule_params(self, interface: str) -> RuleCreateParams:
+    def to_rule_params(self, interface: str, label: str = "") -> RuleCreateParams:
         return RuleCreateParams(
             interface=interface,
-            label=f"profile:{self.id}",
-            direction=self.direction,
+            label=label,
+            direction="egress",
             bandwidth_kbit=self.bandwidth_kbit,
             delay_ms=self.delay_ms,
             jitter_ms=self.jitter_ms,
@@ -127,6 +123,59 @@ class NetworkConditionProfile:
             variation=self.variation,
             disconnect_schedule=self.disconnect_schedule,
         )
+
+    @property
+    def is_clean(self) -> bool:
+        return (
+            self.bandwidth_kbit == 0
+            and self.delay_ms == 0
+            and self.jitter_ms == 0
+            and self.loss_pct == 0
+            and self.corrupt_pct == 0
+            and self.duplicate_pct == 0
+            and self.disorder_pct == 0
+            and self.variation is None
+            and self.disconnect_schedule is None
+        )
+
+
+@dataclass
+class NetworkConditionProfile:
+    """Dual-line network condition profile for ATSSS testing.
+
+    Each profile specifies degradation for LINE A (5G) and LINE B (WiFi)
+    independently. The test fixture creates egress rules on all 4 interfaces:
+      wan_a_in  (LINE A DL), lan_a_out (LINE A UL),
+      wan_b_in  (LINE B DL), lan_b_out (LINE B UL).
+    """
+
+    id: str
+    name: str
+    description: str = ""
+    line_a: LineRuleConfig | None = None
+    line_b: LineRuleConfig | None = None
+
+    def get_rule_params(self, interfaces: dict[str, str]) -> list[RuleCreateParams]:
+        """Generate RuleCreateParams for all affected interfaces.
+
+        Args:
+            interfaces: mapping with keys line_a_dl, line_a_ul, line_b_dl, line_b_ul
+
+        Returns:
+            List of RuleCreateParams (only for non-clean lines).
+        """
+        rules: list[RuleCreateParams] = []
+        if self.line_a is not None and not self.line_a.is_clean:
+            rules.append(self.line_a.to_rule_params(
+                interfaces["line_a_dl"], label=f"{self.id}:a_dl"))
+            rules.append(self.line_a.to_rule_params(
+                interfaces["line_a_ul"], label=f"{self.id}:a_ul"))
+        if self.line_b is not None and not self.line_b.is_clean:
+            rules.append(self.line_b.to_rule_params(
+                interfaces["line_b_dl"], label=f"{self.id}:b_dl"))
+            rules.append(self.line_b.to_rule_params(
+                interfaces["line_b_ul"], label=f"{self.id}:b_ul"))
+        return rules
 
 
 @dataclass
