@@ -10,6 +10,10 @@ results_dir = sys.argv[1] if len(sys.argv) > 1 else "allure-results"
 # Find all test result files
 result_files = sorted(glob.glob(f"{results_dir}/*-result.json"))
 
+passed = 0
+failed = 0
+total = 0
+
 for rf in result_files:
     try:
         data = json.load(open(rf))
@@ -19,10 +23,13 @@ for rf in result_files:
     test_name = data.get("name", "unknown")
     status = data.get("status", "unknown")
     full_name = data.get("fullName", "")
+    duration_ms = data.get("time", {}).get("duration", 0)
 
-    # Only show mode_switching and link_weight tests
-    if "mode_switching" not in full_name and "link_weight" not in full_name:
-        continue
+    total += 1
+    if status == "passed":
+        passed += 1
+    elif status in ("failed", "broken"):
+        failed += 1
 
     # Find attachments with measurement data
     attachments = data.get("attachments", [])
@@ -30,10 +37,9 @@ for rf in result_files:
     for step in data.get("steps", []):
         attachments.extend(step.get("attachments", []))
 
+    status_icon = {"passed": "PASS", "failed": "FAIL", "broken": "BROKE", "skipped": "SKIP"}.get(status, status.upper())
     print(f"\n{'='*80}")
-    print(f"TEST: {test_name}")
-    print(f"STATUS: {status}")
-    print(f"FULL: {full_name}")
+    print(f"[{status_icon}] {test_name}  ({duration_ms/1000:.1f}s)")
 
     for att in attachments:
         att_name = att.get("name", "")
@@ -42,7 +48,6 @@ for rf in result_files:
         if os.path.exists(att_path):
             try:
                 content = open(att_path).read()
-                # Try to parse as JSON and pretty print
                 try:
                     jdata = json.loads(content)
                     print(f"\n  [{att_name}]")
@@ -56,4 +61,13 @@ for rf in result_files:
             except Exception:
                 pass
 
-print()
+    # Show failure message if failed
+    if status in ("failed", "broken"):
+        status_details = data.get("statusDetails", {})
+        msg = status_details.get("message", "")
+        if msg:
+            print(f"\n  FAILURE: {msg[:200]}")
+
+print(f"\n{'='*80}")
+print(f"SUMMARY: {passed} passed, {failed} failed, {total} total")
+print(f"{'='*80}")
