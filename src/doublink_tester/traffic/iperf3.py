@@ -74,9 +74,38 @@ class Iperf3Generator:
             logger.warning("iperf3 stderr: %s", stderr.decode("utf-8", errors="replace"))
         return self._parse_json_output(raw, ended_at)
 
-    async def run(self, target: str, duration_s: int, **kwargs: Any) -> TrafficResult:
-        await self.start(target, duration_s, **kwargs)
-        return await self.wait()
+    async def run(
+        self,
+        target: str,
+        duration_s: int,
+        retries: int = 3,
+        retry_delay_s: float = 5.0,
+        **kwargs: Any,
+    ) -> TrafficResult:
+        """Run iperf3 with retry logic for transient errors (server busy, connection reset)."""
+        last_result: TrafficResult | None = None
+        for attempt in range(1, retries + 1):
+            await self.start(target, duration_s, **kwargs)
+            result = await self.wait()
+
+            # Check for transient iperf3 errors that warrant a retry
+            raw = result.raw_output or ""
+            is_server_busy = "server is busy" in raw or "server is busy" in str(result)
+            is_conn_reset = "Connection reset" in raw or "unable to send control message" in raw
+            is_transient = (result.throughput_mbps == 0 and result.protocol != "unknown"
+                           and (is_server_busy or is_conn_reset))
+
+            if not is_transient or attempt == retries:
+                return result
+
+            logger.warning(
+                "iperf3 transient error (attempt %d/%d), retrying in %.0fs ...",
+                attempt, retries, retry_delay_s,
+            )
+            last_result = result
+            await asyncio.sleep(retry_delay_s)
+
+        return last_result or result  # type: ignore[possibly-undefined]
 
     def is_running(self) -> bool:
         return self._process is not None and self._process.returncode is None
