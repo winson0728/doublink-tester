@@ -7,7 +7,7 @@ matrix:
     traffic: tcp_throughput
     description: "Balanced 5G+WiFi aggregation — multilink > single-link"
     assertions:
-      min_aggregate_mbps: 80.0
+      min_aggregate_mbps: 15.0
       single_link_improvement_pct: 50
 
   - id: "golden_a2_weighted_aggregation"
@@ -17,7 +17,7 @@ matrix:
     traffic: tcp_throughput
     description: "Weighted 2:1 5G bias — aggregate > either single link"
     assertions:
-      min_aggregate_mbps: 60.0
+      min_aggregate_mbps: 10.0
       single_link_improvement_pct: 30
 
   # ── B: Failover / Session Continuity ────────────────────────

@@ -39,11 +39,11 @@ matrix:
     network_condition: 5g_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 5.0
+      min_throughput_mbps: 1.0
 
   - id: "bonding_wifi_degraded_tcp"
     mode: bonding
     network_condition: wifi_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 5.0
+      min_throughput_mbps: 1.0

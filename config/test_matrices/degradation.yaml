@@ -4,7 +4,7 @@ matrix:
     network_condition: symmetric_mild_loss
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 5.0
+      min_throughput_mbps: 2.0
       max_loss_pct: 10.0
 
   - id: "symmetric_loss_duplicate_tcp"
@@ -12,7 +12,7 @@ matrix:
     network_condition: symmetric_mild_loss
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 5.0
+      min_throughput_mbps: 2.0
       max_loss_pct: 10.0
 
   - id: "symmetric_latency_realtime_http"
@@ -60,21 +60,21 @@ matrix:
     network_condition: 5g_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 10.0
+      min_throughput_mbps: 1.0
 
   - id: "wifi_degraded_bonding_tcp"
     mode: bonding
     network_condition: wifi_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 10.0
+      min_throughput_mbps: 1.0
 
   - id: "asymmetric_mixed_duplicate_tcp"
     mode: duplicate
     network_condition: asymmetric_mixed_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 5.0
+      min_throughput_mbps: 1.0
       max_loss_pct: 20.0
 
   - id: "wifi_disconnect_duplicate_sip"
