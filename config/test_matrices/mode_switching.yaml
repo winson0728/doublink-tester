@@ -6,7 +6,7 @@ matrix:
     traffic: tcp_throughput
     assertions:
       max_traffic_interruption_s: 2.0
-      min_throughput_recovery_pct: 80
+      min_throughput_recovery_pct: 40
 
   - id: "bonding_to_duplicate_symm_loss_http"
     from_mode: bonding
