@@ -36,7 +36,7 @@ async def apply_network_condition(netemu_client, network_profiles, settings):
     Usage::
 
         async def test_something(apply_network_condition):
-            rule_ids = await apply_network_condition("symmetric_loss")
+            rule_ids = await apply_network_condition("symmetric_mild_loss")
             # ... test logic (rules on both lines) ...
             # all rules are automatically cleared after the test
     """

@@ -23,8 +23,8 @@ class TestLinkDisconnectFailover:
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("disconnect_profile,surviving_link", [
-        ("5g_disconnect", "WiFi (LINE B)"),
-        ("wifi_disconnect", "5G (LINE A)"),
+        ("5g_disconnect_visible", "WiFi (LINE B)"),
+        ("wifi_disconnect_visible", "5G (LINE A)"),
     ])
     @allure.story("Link Disconnect Failover")
     async def test_failover_on_disconnect(
@@ -84,7 +84,7 @@ class TestLinkDisconnectFailover:
         await set_multilink_mode(mode)
 
         # Disconnect 5G
-        await apply_network_condition("5g_disconnect")
+        await apply_network_condition("5g_disconnect_visible")
 
         result = await iperf3_runner(protocol="tcp", duration_s=10)
 
@@ -108,8 +108,8 @@ class TestIntermittentDisconnect:
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("profile_id,flapping_link", [
-        ("5g_intermittent", "5G (LINE A)"),
-        ("wifi_intermittent", "WiFi (LINE B)"),
+        ("5g_intermittent_visible", "5G (LINE A)"),
+        ("wifi_intermittent_visible", "WiFi (LINE B)"),
     ])
     @allure.story("Intermittent Disconnect")
     async def test_intermittent_disconnect_survival(
@@ -125,7 +125,7 @@ class TestIntermittentDisconnect:
 
         await set_multilink_mode("duplicate")
 
-        # Apply intermittent profile (periodic 3s disconnects every 30s, 5 repeats)
+        # Apply intermittent profile (periodic 2s disconnects every 15s, 10 repeats)
         await apply_network_condition(profile_id)
 
         # Run long enough to cover at least 2 disconnect cycles
@@ -214,7 +214,7 @@ class TestRecoveryAfterDisconnect:
         await set_multilink_mode("bonding")
 
         # 1. Disconnect 5G
-        rule_ids = await apply_network_condition("5g_disconnect")
+        rule_ids = await apply_network_condition("5g_disconnect_visible")
         during = await iperf3_runner(protocol="tcp", duration_s=5)
 
         # 2. Reconnect by clearing rules

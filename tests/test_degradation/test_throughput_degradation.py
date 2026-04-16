@@ -25,11 +25,11 @@ class TestNetworkConditionApplied:
 
     @pytest.mark.degradation
     @pytest.mark.parametrize("condition,expected_rule_count", [
-        ("clean", 0),
-        ("symmetric_loss", 4),       # both lines → 4 rules (A-DL, A-UL, B-DL, B-UL)
-        ("symmetric_latency", 4),
-        ("5g_degraded", 2),          # only LINE A → 2 rules (A-DL, A-UL)
-        ("wifi_degraded", 2),        # only LINE B → 2 rules (B-DL, B-UL)
+        ("clean_controlled", 4),     # both lines shaped → 4 rules (A-DL, A-UL, B-DL, B-UL)
+        ("symmetric_mild_loss", 4),
+        ("symmetric_mild_latency", 4),
+        ("5g_degraded_moderate", 4), # both lines non-zero → 4 rules
+        ("wifi_degraded_moderate", 4),
     ])
     @allure.story("Apply ATSSS Profile")
     async def test_network_condition_applied(
@@ -65,7 +65,7 @@ class TestNetworkConditionApplied:
         netemu_client,
     ):
         """Verify that clearing all rules restores clean network state."""
-        rule_ids = await apply_network_condition("symmetric_loss")
+        rule_ids = await apply_network_condition("symmetric_mild_loss")
         assert len(rule_ids) == 4
 
         # Manually clear all rules (fixture will also clear on teardown)
@@ -93,7 +93,7 @@ class TestDegradationWithVariation:
         netemu_client,
     ):
         """Verify that wifi_interference profile creates LINE B rules with variation enabled."""
-        rule_ids = await apply_network_condition("wifi_interference")
+        rule_ids = await apply_network_condition("wifi_interference_moderate")
 
         # wifi_interference: LINE A shaped (bw cap), LINE B with variation → 4 rules
         assert len(rule_ids) == 4
@@ -116,7 +116,7 @@ class TestDegradationWithVariation:
         netemu_client,
     ):
         """Verify that both_varied profile applies variation on all 4 interfaces."""
-        rule_ids = await apply_network_condition("both_varied")
+        rule_ids = await apply_network_condition("both_varied_moderate")
         assert len(rule_ids) == 4
 
         for rule_id in rule_ids:
@@ -133,7 +133,7 @@ class TestDisconnectSchedule:
     """Verify intermittent disconnect functionality."""
 
     @pytest.mark.degradation
-    @pytest.mark.parametrize("profile_id", ["5g_intermittent", "wifi_intermittent"])
+    @pytest.mark.parametrize("profile_id", ["5g_intermittent_visible", "wifi_intermittent_visible"])
     @allure.story("Intermittent Disconnect")
     async def test_disconnect_schedule_applied(
         self,
@@ -145,7 +145,7 @@ class TestDisconnectSchedule:
         allure.dynamic.title(f"Disconnect schedule: {profile_id}")
 
         rule_ids = await apply_network_condition(profile_id)
-        assert len(rule_ids) == 2  # only one line degraded → DL + UL
+        assert len(rule_ids) == 4  # both lines shaped → 4 rules (DL + UL per line)
 
         for rule_id in rule_ids:
             rule = await netemu_client.get_rule(rule_id)
@@ -181,12 +181,12 @@ class TestTcpThroughputDegradation:
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("condition,min_throughput_mbps", [
-        ("symmetric_loss", 1.0),
-        ("symmetric_latency", 0.5),
-        ("symmetric_congested", 0.1),
-        ("5g_degraded", 0.5),        # WiFi clean → steering to WiFi
-        ("wifi_degraded", 0.5),       # 5G clean → steering to 5G
-        ("asymmetric_mixed", 0.5),    # 5G latency + WiFi loss
+        ("symmetric_mild_loss", 10.0),
+        ("symmetric_mild_latency", 5.0),
+        ("congested_recoverable", 2.0),
+        ("5g_degraded_moderate", 10.0),
+        ("wifi_degraded_moderate", 10.0),
+        ("asymmetric_mixed_moderate", 5.0),
     ])
     @allure.story("TCP Throughput Under Degradation")
     async def test_tcp_under_degradation(
@@ -251,10 +251,10 @@ class TestUdpDegradation:
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("condition,max_loss_pct,max_jitter_ms", [
-        ("symmetric_loss", 50.0, 200.0),
-        ("symmetric_latency", 20.0, 300.0),
-        ("wifi_interference", 30.0, 200.0),
-        ("asymmetric_mixed", 40.0, 250.0),
+        ("symmetric_mild_loss", 10.0, 100.0),
+        ("symmetric_mild_latency", 5.0, 100.0),
+        ("wifi_interference_moderate", 10.0, 100.0),
+        ("asymmetric_mixed_moderate", 10.0, 100.0),
     ])
     @allure.story("UDP Under Degradation")
     async def test_udp_under_degradation(
@@ -299,10 +299,10 @@ class TestSteeringBehaviour:
     @pytest.mark.degradation
     @pytest.mark.slow
     @pytest.mark.parametrize("profile_id,description", [
-        ("5g_degraded", "5G bad, WiFi clean — expect steering to WiFi"),
-        ("wifi_degraded", "WiFi bad, 5G clean — expect steering to 5G"),
-        ("5g_high_latency", "5G high latency, WiFi normal — expect latency-aware steering"),
-        ("wifi_high_latency", "WiFi high latency, 5G normal — expect latency-aware steering"),
+        ("5g_degraded_moderate", "5G degraded, WiFi healthy — expect steering to WiFi"),
+        ("wifi_degraded_moderate", "WiFi degraded, 5G healthy — expect steering to 5G"),
+        ("5g_high_latency_moderate", "5G high latency, WiFi normal — expect latency-aware steering"),
+        ("wifi_high_latency_moderate", "WiFi high latency, 5G normal — expect latency-aware steering"),
     ])
     @allure.story("Asymmetric Steering")
     async def test_steering_maintains_throughput(
@@ -332,7 +332,7 @@ class TestSteeringBehaviour:
         )
 
         # With one clean link available, throughput should remain reasonable
-        assert result.throughput_mbps > 1.0, (
+        assert result.throughput_mbps > 10.0, (
             f"Throughput {result.throughput_mbps:.2f} Mbps too low — "
             f"ATSSS should steer to healthy link"
         )
@@ -360,7 +360,7 @@ class TestRecoveryAfterDegradation:
         allure.dynamic.title("TCP recovery after symmetric congestion")
 
         # 1. Measure under congestion (both lines)
-        rule_ids = await apply_network_condition("symmetric_congested")
+        rule_ids = await apply_network_condition("congested_recoverable")
         degraded = await iperf3_runner(protocol="tcp", duration_s=10)
 
         # 2. Clear all rules

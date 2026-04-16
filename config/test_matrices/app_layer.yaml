@@ -1,7 +1,7 @@
 matrix:
   - id: "http_clean_bonding"
     mode: bonding
-    network_condition: clean
+    network_condition: clean_controlled
     traffic: http_load
     assertions:
       min_qps: 100
@@ -10,7 +10,7 @@ matrix:
 
   - id: "grpc_clean_bonding"
     mode: bonding
-    network_condition: clean
+    network_condition: clean_controlled
     traffic: grpc_load
     assertions:
       min_qps: 50
@@ -19,32 +19,32 @@ matrix:
 
   - id: "sip_clean_realtime"
     mode: real_time
-    network_condition: clean
+    network_condition: clean_controlled
     traffic: sip_calls
     assertions:
       min_success_rate: 0.99
 
   - id: "http_symmetric_loss_duplicate"
     mode: duplicate
-    network_condition: symmetric_loss
+    network_condition: symmetric_mild_loss
     traffic: http_load
     assertions:
       min_qps: 50
-      min_success_rate: 0.90
+      min_success_rate: 0.95
       max_latency_p95_ms: 1000
 
   - id: "sip_5g_intermittent_duplicate"
     mode: duplicate
-    network_condition: 5g_intermittent
+    network_condition: 5g_intermittent_visible
     traffic: sip_calls
     assertions:
       min_success_rate: 0.80
 
   - id: "http_asymmetric_mixed_bonding"
     mode: bonding
-    network_condition: asymmetric_mixed
+    network_condition: asymmetric_mixed_moderate
     traffic: http_load
     assertions:
       min_qps: 30
-      min_success_rate: 0.85
+      min_success_rate: 0.90
       max_latency_p95_ms: 1500

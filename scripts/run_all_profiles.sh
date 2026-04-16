@@ -68,163 +68,163 @@ echo " $(date)"
 echo "=========================================="
 echo ""
 
-# 1. clean
-echo "[1/15] clean (baseline)"
+# 1. clean_controlled
+echo "[1/15] clean_controlled (baseline)"
 clear_rules
-run_tcp "01_clean"
-run_udp "01_clean" "50M"
+run_tcp "01_clean_controlled"
+run_udp "01_clean_controlled" "50M"
 echo ""
 
-# 2. symmetric_loss
-echo "[2/15] symmetric_loss (both lines 2% loss, 20ms delay)"
+# 2. symmetric_mild_loss
+echo "[2/15] symmetric_mild_loss (both lines 2% loss, 20ms delay)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 sleep 3
-run_tcp "02_symmetric_loss"
-run_udp "02_symmetric_loss"
+run_tcp "02_symmetric_mild_loss"
+run_udp "02_symmetric_mild_loss"
 echo ""
 
-# 3. symmetric_latency
-echo "[3/15] symmetric_latency (both lines 200ms delay)"
+# 3. symmetric_mild_latency
+echo "[3/15] symmetric_mild_latency (both lines 200ms delay)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 sleep 3
-run_tcp "03_symmetric_latency"
-run_udp "03_symmetric_latency"
+run_tcp "03_symmetric_mild_latency"
+run_udp "03_symmetric_mild_latency"
 echo ""
 
-# 4. symmetric_congested
-echo "[4/15] symmetric_congested (both lines 1Kbps, 200ms, 5% loss)"
+# 4. congested_recoverable
+echo "[4/15] congested_recoverable (both lines 1Kbps, 200ms, 5% loss)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 sleep 3
-run_tcp "04_symmetric_congested"
-run_udp "04_symmetric_congested"
+run_tcp "04_congested_recoverable"
+run_udp "04_congested_recoverable"
 echo ""
 
-# 5. 5g_degraded
-echo "[5/15] 5g_degraded (LINE A bad, LINE B clean)"
+# 5. 5g_degraded_moderate
+echo "[5/15] 5g_degraded_moderate (LINE A bad, LINE B clean)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 sleep 3
-run_tcp "05_5g_degraded"
-run_udp "05_5g_degraded"
+run_tcp "05_5g_degraded_moderate"
+run_udp "05_5g_degraded_moderate"
 echo ""
 
-# 6. wifi_degraded
-echo "[6/15] wifi_degraded (LINE B bad, LINE A clean)"
+# 6. wifi_degraded_moderate
+echo "[6/15] wifi_degraded_moderate (LINE B bad, LINE A clean)"
 clear_rules
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 sleep 3
-run_tcp "06_wifi_degraded"
-run_udp "06_wifi_degraded"
+run_tcp "06_wifi_degraded_moderate"
+run_udp "06_wifi_degraded_moderate"
 echo ""
 
-# 7. 5g_high_latency
-echo "[7/15] 5g_high_latency (LINE A 300ms, LINE B normal)"
+# 7. 5g_high_latency_moderate
+echo "[7/15] 5g_high_latency_moderate (LINE A 300ms, LINE B normal)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 sleep 3
-run_tcp "07_5g_high_latency"
-run_udp "07_5g_high_latency"
+run_tcp "07_5g_high_latency_moderate"
+run_udp "07_5g_high_latency_moderate"
 echo ""
 
-# 8. wifi_high_latency
-echo "[8/15] wifi_high_latency (LINE B 300ms, LINE A normal)"
+# 8. wifi_high_latency_moderate
+echo "[8/15] wifi_high_latency_moderate (LINE B 300ms, LINE A normal)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 sleep 3
-run_tcp "08_wifi_high_latency"
-run_udp "08_wifi_high_latency"
+run_tcp "08_wifi_high_latency_moderate"
+run_udp "08_wifi_high_latency_moderate"
 echo ""
 
-# 9. asymmetric_mixed
-echo "[9/15] asymmetric_mixed (5G latency + WiFi loss)"
+# 9. asymmetric_mixed_moderate
+echo "[9/15] asymmetric_mixed_moderate (5G latency + WiFi loss)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":40,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":40,"loss_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"jitter_ms":5,"loss_pct":5.0}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"jitter_ms":5,"loss_pct":5.0}'
 sleep 3
-run_tcp "09_asymmetric_mixed"
-run_udp "09_asymmetric_mixed"
+run_tcp "09_asymmetric_mixed_moderate"
+run_udp "09_asymmetric_mixed_moderate"
 echo ""
 
-# 10. 5g_disconnect
-echo "[10/15] 5g_disconnect (LINE A 100% loss)"
+# 10. 5g_disconnect_visible
+echo "[10/15] 5g_disconnect_visible (LINE A 100% loss)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","loss_pct":100}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","loss_pct":100}'
 sleep 3
-run_tcp "10_5g_disconnect"
+run_tcp "10_5g_disconnect_visible"
 echo ""
 
-# 11. wifi_disconnect
-echo "[11/15] wifi_disconnect (LINE B 100% loss)"
+# 11. wifi_disconnect_visible
+echo "[11/15] wifi_disconnect_visible (LINE B 100% loss)"
 clear_rules
 apply_rule '{"interface":"wan_b_in","direction":"egress","loss_pct":100}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","loss_pct":100}'
 sleep 3
-run_tcp "11_wifi_disconnect"
+run_tcp "11_wifi_disconnect_visible"
 echo ""
 
-# 12. 5g_intermittent
-echo "[12/15] 5g_intermittent (LINE A flapping every 30s)"
+# 12. 5g_intermittent_visible
+echo "[12/15] 5g_intermittent_visible (LINE A flapping every 30s)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"loss_pct":0.1,"disconnect_schedule":{"enabled":true,"disconnect_duration_s":3,"interval_s":30,"repeat_count":5}}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"loss_pct":0.1,"disconnect_schedule":{"enabled":true,"disconnect_duration_s":3,"interval_s":30,"repeat_count":5}}'
 sleep 3
-run_tcp "12_5g_intermittent"
+run_tcp "12_5g_intermittent_visible"
 echo ""
 
-# 13. wifi_intermittent
-echo "[13/15] wifi_intermittent (LINE B flapping every 30s)"
+# 13. wifi_intermittent_visible
+echo "[13/15] wifi_intermittent_visible (LINE B flapping every 30s)"
 clear_rules
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"loss_pct":0.1,"disconnect_schedule":{"enabled":true,"disconnect_duration_s":3,"interval_s":30,"repeat_count":5}}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"loss_pct":0.1,"disconnect_schedule":{"enabled":true,"disconnect_duration_s":3,"interval_s":30,"repeat_count":5}}'
 sleep 3
-run_tcp "13_wifi_intermittent"
+run_tcp "13_wifi_intermittent_visible"
 echo ""
 
-# 14. wifi_interference
-echo "[14/15] wifi_interference (LINE A capped, LINE B varied)"
+# 14. wifi_interference_moderate
+echo "[14/15] wifi_interference_moderate (LINE A capped, LINE B varied)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"loss_pct":0}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"loss_pct":0}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":15,"jitter_ms":0,"loss_pct":1.5,"variation":{"enabled":true,"delay_range_ms":10,"jitter_range_ms":15,"loss_range_pct":1.0,"bandwidth_range_kbit":20000,"interval_s":3}}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":15,"jitter_ms":0,"loss_pct":1.5,"variation":{"enabled":true,"delay_range_ms":10,"jitter_range_ms":15,"loss_range_pct":1.0,"bandwidth_range_kbit":20000,"interval_s":3}}'
 sleep 3
-run_tcp "14_wifi_interference"
-run_udp "14_wifi_interference"
+run_tcp "14_wifi_interference_moderate"
+run_udp "14_wifi_interference_moderate"
 echo ""
 
-# 15. both_varied
-echo "[15/15] both_varied (both lines dynamic variation)"
+# 15. both_varied_moderate
+echo "[15/15] both_varied_moderate (both lines dynamic variation)"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":30,"jitter_ms":0,"loss_pct":1.0,"variation":{"enabled":true,"delay_range_ms":20,"jitter_range_ms":15,"loss_range_pct":0.5,"bandwidth_range_kbit":20000,"interval_s":5}}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":30,"jitter_ms":0,"loss_pct":1.0,"variation":{"enabled":true,"delay_range_ms":20,"jitter_range_ms":15,"loss_range_pct":0.5,"bandwidth_range_kbit":20000,"interval_s":5}}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":30000,"delay_ms":20,"jitter_ms":0,"loss_pct":2.0,"variation":{"enabled":true,"delay_range_ms":15,"jitter_range_ms":10,"loss_range_pct":1.0,"bandwidth_range_kbit":15000,"interval_s":5}}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":30000,"delay_ms":20,"jitter_ms":0,"loss_pct":2.0,"variation":{"enabled":true,"delay_range_ms":15,"jitter_range_ms":10,"loss_range_pct":1.0,"bandwidth_range_kbit":15000,"interval_s":5}}'
 sleep 3
-run_tcp "15_both_varied"
-run_udp "15_both_varied"
+run_tcp "15_both_varied_moderate"
+run_udp "15_both_varied_moderate"
 echo ""
 
 # Cleanup

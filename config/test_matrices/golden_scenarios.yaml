@@ -1,0 +1,62 @@
+matrix:
+  # ── A: Bonding Aggregation ──────────────────────────────────
+  - id: "golden_a1_balanced_aggregation"
+    scenario: "A1"
+    profile: golden_balanced_aggregation
+    mode: bonding
+    traffic: tcp_throughput
+    description: "Balanced 5G+WiFi aggregation — multilink > single-link"
+    assertions:
+      min_aggregate_mbps: 80.0
+      single_link_improvement_pct: 50
+
+  - id: "golden_a2_weighted_aggregation"
+    scenario: "A2"
+    profile: golden_weighted_aggregation
+    mode: bonding
+    traffic: tcp_throughput
+    description: "Weighted 2:1 5G bias — aggregate > either single link"
+    assertions:
+      min_aggregate_mbps: 60.0
+      single_link_improvement_pct: 30
+
+  # ── B: Failover / Session Continuity ────────────────────────
+  - id: "golden_b1_hard_failover"
+    scenario: "B1"
+    profile: golden_hard_failover
+    mode: bonding
+    traffic: tcp_throughput
+    description: "Primary disconnect every 20s for 3s — session maintained"
+    assertions:
+      min_throughput_mbps: 5.0
+      max_interruption_s: 5.0
+
+  - id: "golden_b2_intermittent_flap"
+    scenario: "B2"
+    profile: golden_intermittent_flap
+    mode: duplicate
+    traffic: tcp_throughput
+    description: "5G flaps every 15s — multilink stays stable"
+    assertions:
+      min_throughput_mbps: 10.0
+
+  # ── C: Duplicate / Reliability ──────────────────────────────
+  - id: "golden_c1_loss_protection"
+    scenario: "C1"
+    profile: golden_loss_protection
+    mode: duplicate
+    traffic: http_load
+    description: "Duplicate mode protects against 5G 2% loss better than bonding"
+    assertions:
+      duplicate_min_success_rate: 0.98
+      bonding_min_success_rate: 0.90
+
+  - id: "golden_c2_burst_loss"
+    scenario: "C2"
+    profile: golden_burst_loss
+    mode: duplicate
+    traffic: tcp_throughput
+    description: "Fluctuating 0-10% loss on 5G — duplicate resilience"
+    assertions:
+      min_throughput_mbps: 10.0
+      min_success_rate: 0.95

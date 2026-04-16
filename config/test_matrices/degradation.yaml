@@ -1,54 +1,54 @@
 matrix:
   - id: "symmetric_loss_bonding_tcp"
     mode: bonding
-    network_condition: symmetric_loss
+    network_condition: symmetric_mild_loss
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
-      max_loss_pct: 50.0
+      min_throughput_mbps: 5.0
+      max_loss_pct: 10.0
 
   - id: "symmetric_loss_duplicate_tcp"
     mode: duplicate
-    network_condition: symmetric_loss
+    network_condition: symmetric_mild_loss
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
-      max_loss_pct: 50.0
+      min_throughput_mbps: 5.0
+      max_loss_pct: 10.0
 
   - id: "symmetric_latency_realtime_http"
     mode: real_time
-    network_condition: symmetric_latency
+    network_condition: symmetric_mild_latency
     traffic: http_load
     assertions:
       min_success_rate: 0.90
-      max_latency_p95_ms: 2000
+      max_latency_p95_ms: 500
 
   - id: "symmetric_latency_bonding_http"
     mode: bonding
-    network_condition: symmetric_latency
+    network_condition: symmetric_mild_latency
     traffic: http_load
     assertions:
       min_success_rate: 0.90
-      max_latency_p95_ms: 2000
+      max_latency_p95_ms: 500
 
   - id: "symmetric_congested_bonding_tcp"
     mode: bonding
-    network_condition: symmetric_congested
+    network_condition: congested_recoverable
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 0.1
-      max_loss_pct: 80.0
+      min_throughput_mbps: 2.0
+      max_loss_pct: 20.0
 
   - id: "5g_disconnect_realtime_sip"
     mode: real_time
-    network_condition: 5g_disconnect
+    network_condition: 5g_disconnect_visible
     traffic: sip_calls
     assertions:
       min_success_rate: 0.80
 
   - id: "wifi_interference_bonding_udp"
     mode: bonding
-    network_condition: wifi_interference
+    network_condition: wifi_interference_moderate
     traffic: udp_voip
     assertions:
       min_success_rate: 0.80
@@ -57,29 +57,29 @@ matrix:
   # ── ATSSS Steering tests ──────────────────────────
   - id: "5g_degraded_bonding_tcp"
     mode: bonding
-    network_condition: 5g_degraded
+    network_condition: 5g_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
+      min_throughput_mbps: 10.0
 
   - id: "wifi_degraded_bonding_tcp"
     mode: bonding
-    network_condition: wifi_degraded
+    network_condition: wifi_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
+      min_throughput_mbps: 10.0
 
   - id: "asymmetric_mixed_duplicate_tcp"
     mode: duplicate
-    network_condition: asymmetric_mixed
+    network_condition: asymmetric_mixed_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 0.5
-      max_loss_pct: 60.0
+      min_throughput_mbps: 5.0
+      max_loss_pct: 20.0
 
   - id: "wifi_disconnect_duplicate_sip"
     mode: duplicate
-    network_condition: wifi_disconnect
+    network_condition: wifi_disconnect_visible
     traffic: sip_calls
     assertions:
       min_success_rate: 0.80

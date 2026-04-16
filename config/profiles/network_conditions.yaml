@@ -11,250 +11,324 @@
 #   wan_b_in  egress = LINE B DL    lan_b_out egress = LINE B UL
 #
 # Each profile specifies line_a (5G) and line_b (WiFi) independently.
-# Omit a line or set all params to 0 = clean (no rule created).
+# Fields: bandwidth_kbit, delay_ms, jitter_ms, loss_pct, corrupt_pct,
+#         duplicate_pct, disorder_pct, variation, disconnect_schedule
 # ────────────────────────────────────────────────────────────────
 
 profiles:
 
-  # ── Baseline ─────────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════
+  #  Base Profiles (15)
+  # ════════════════════════════════════════════════════════════════
 
-  - id: clean
-    name: "Clean — Baseline"
-    description: "Both lines clean, no impairment"
+  # ── 1. Baseline ──────────────────────────────────────────────
+
+  - id: clean_controlled
+    name: "Clean Controlled Baseline"
+    description: "5G 60M/25ms/0.1% loss, WiFi 60M/10ms/0.1% loss — clean reference"
     line_a:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-    line_b:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-
-  # ── Symmetric (both lines same condition) ────────────────────
-
-  - id: symmetric_loss
-    name: "Symmetric — Moderate Loss"
-    description: "Both 5G and WiFi with moderate loss, test splitting resilience"
-    line_a:
-      bandwidth_kbit: 100000
-      delay_ms: 20
-      jitter_ms: 5
-      loss_pct: 2.0
-    line_b:
-      bandwidth_kbit: 100000
-      delay_ms: 20
-      jitter_ms: 5
-      loss_pct: 2.0
-
-  - id: symmetric_latency
-    name: "Symmetric — High Latency"
-    description: "Both lines with high latency, test bonding/splitting under delay"
-    line_a:
-      bandwidth_kbit: 20000
-      delay_ms: 200
-      jitter_ms: 30
-      loss_pct: 0.5
-    line_b:
-      bandwidth_kbit: 20000
-      delay_ms: 200
-      jitter_ms: 30
-      loss_pct: 0.5
-
-  - id: symmetric_congested
-    name: "Symmetric — Congested"
-    description: "Both lines severely congested, test minimum throughput"
-    line_a:
-      bandwidth_kbit: 1000
-      delay_ms: 200
-      jitter_ms: 100
-      loss_pct: 5.0
-      corrupt_pct: 0.5
-    line_b:
-      bandwidth_kbit: 1000
-      delay_ms: 200
-      jitter_ms: 100
-      loss_pct: 5.0
-      corrupt_pct: 0.5
-
-  # ── Asymmetric — Steering tests ──────────────────────────────
-
-  - id: 5g_degraded
-    name: "5G Degraded, WiFi Clean"
-    description: "LINE A (5G) with high loss, LINE B (WiFi) clean — test steering to WiFi"
-    line_a:
-      bandwidth_kbit: 5000
-      delay_ms: 80
-      jitter_ms: 40
-      loss_pct: 5.0
-      corrupt_pct: 0.2
-    line_b:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-
-  - id: wifi_degraded
-    name: "WiFi Degraded, 5G Clean"
-    description: "LINE B (WiFi) with high loss, LINE A (5G) clean — test steering to 5G"
-    line_a:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-    line_b:
-      bandwidth_kbit: 5000
-      delay_ms: 80
-      jitter_ms: 40
-      loss_pct: 5.0
-      corrupt_pct: 0.2
-
-  - id: 5g_high_latency
-    name: "5G High Latency, WiFi Normal"
-    description: "LINE A (5G) satellite-like delay, LINE B (WiFi) normal — test latency-aware steering"
-    line_a:
-      bandwidth_kbit: 20000
-      delay_ms: 300
-      jitter_ms: 50
-      loss_pct: 0.5
-    line_b:
-      bandwidth_kbit: 100000
-      delay_ms: 5
-      jitter_ms: 2
-      loss_pct: 0
-
-  - id: wifi_high_latency
-    name: "WiFi High Latency, 5G Normal"
-    description: "LINE B (WiFi) high delay, LINE A (5G) normal — test latency-aware steering"
-    line_a:
-      bandwidth_kbit: 100000
-      delay_ms: 5
-      jitter_ms: 2
-      loss_pct: 0
-    line_b:
-      bandwidth_kbit: 20000
-      delay_ms: 300
-      jitter_ms: 50
-      loss_pct: 0.5
-
-  - id: asymmetric_mixed
-    name: "Asymmetric — 5G Latency + WiFi Loss"
-    description: "LINE A high latency, LINE B high loss — test ATSSS steering decision"
-    line_a:
-      bandwidth_kbit: 20000
-      delay_ms: 200
-      jitter_ms: 40
-      loss_pct: 0.5
-    line_b:
-      bandwidth_kbit: 50000
-      delay_ms: 10
-      jitter_ms: 5
-      loss_pct: 5.0
-
-  # ── Switching — Disconnect tests ─────────────────────────────
-
-  - id: 5g_disconnect
-    name: "5G Disconnect (LINE A Down)"
-    description: "LINE A completely offline — test switching to WiFi only"
-    line_a:
-      bandwidth_kbit: 1
-      delay_ms: 0
-      loss_pct: 100.0
-    line_b:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-
-  - id: wifi_disconnect
-    name: "WiFi Disconnect (LINE B Down)"
-    description: "LINE B completely offline — test switching to 5G only"
-    line_a:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-    line_b:
-      bandwidth_kbit: 1
-      delay_ms: 0
-      loss_pct: 100.0
-
-  - id: 5g_intermittent
-    name: "5G Intermittent Disconnect"
-    description: "LINE A periodic disconnects, LINE B stable — test switch/split resilience"
-    line_a:
-      bandwidth_kbit: 50000
-      delay_ms: 10
-      jitter_ms: 2
+      bandwidth_kbit: 60000
+      delay_ms: 25
       loss_pct: 0.1
-      disconnect_schedule:
-        enabled: true
-        disconnect_s: 3.0
-        interval_s: 30.0
-        repeat: 5
     line_b:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-
-  - id: wifi_intermittent
-    name: "WiFi Intermittent Disconnect"
-    description: "LINE B periodic disconnects, LINE A stable — test switch/split resilience"
-    line_a:
-      bandwidth_kbit: 0
-      delay_ms: 0
-      loss_pct: 0
-    line_b:
-      bandwidth_kbit: 50000
+      bandwidth_kbit: 60000
       delay_ms: 10
-      jitter_ms: 2
       loss_pct: 0.1
-      disconnect_schedule:
-        enabled: true
-        disconnect_s: 3.0
-        interval_s: 30.0
-        repeat: 5
 
-  # ── Dynamic Variation ────────────────────────────────────────
+  # ── 2-4. Symmetric ──────────────────────────────────────────
 
-  - id: wifi_interference
-    name: "WiFi Interference (Dynamic)"
-    description: "LINE B fluctuating quality, LINE A stable — test adaptive steering"
+  - id: symmetric_mild_loss
+    name: "Symmetric — Mild Loss"
+    description: "Both lines 50M/20ms/0.3% loss — mild symmetric loss"
     line_a:
-      bandwidth_kbit: 100000
-      delay_ms: 5
-      jitter_ms: 2
-      loss_pct: 0
+      bandwidth_kbit: 50000
+      delay_ms: 20
+      loss_pct: 0.3
     line_b:
       bandwidth_kbit: 50000
-      delay_ms: 15
-      jitter_ms: 20
+      delay_ms: 20
+      loss_pct: 0.3
+
+  - id: symmetric_mild_latency
+    name: "Symmetric — Mild Latency"
+    description: "Both lines 40M/60ms/8ms jitter, no loss — symmetric latency"
+    line_a:
+      bandwidth_kbit: 40000
+      delay_ms: 60
+      jitter_ms: 8
+      loss_pct: 0
+    line_b:
+      bandwidth_kbit: 40000
+      delay_ms: 60
+      jitter_ms: 8
+      loss_pct: 0
+
+  - id: congested_recoverable
+    name: "Congested — Recoverable"
+    description: "Both lines 10M/80ms/1% loss — congested but recoverable"
+    line_a:
+      bandwidth_kbit: 10000
+      delay_ms: 80
+      loss_pct: 1.0
+    line_b:
+      bandwidth_kbit: 10000
+      delay_ms: 80
+      loss_pct: 1.0
+
+  # ── 5-6. Asymmetric — One Line Degraded ─────────────────────
+
+  - id: 5g_degraded_moderate
+    name: "5G Degraded, WiFi Healthy"
+    description: "5G 20M/60ms/1.5% loss, WiFi 40M/10ms/0.1% loss — steer to WiFi"
+    line_a:
+      bandwidth_kbit: 20000
+      delay_ms: 60
       loss_pct: 1.5
-      corrupt_pct: 0.2
+    line_b:
+      bandwidth_kbit: 40000
+      delay_ms: 10
+      loss_pct: 0.1
+
+  - id: wifi_degraded_moderate
+    name: "WiFi Degraded, 5G Healthy"
+    description: "WiFi 20M/40ms/1.5% loss, 5G 40M/20ms/0.1% loss — steer to 5G"
+    line_a:
+      bandwidth_kbit: 40000
+      delay_ms: 20
+      loss_pct: 0.1
+    line_b:
+      bandwidth_kbit: 20000
+      delay_ms: 40
+      loss_pct: 1.5
+
+  # ── 7-8. Asymmetric — High Latency ──────────────────────────
+
+  - id: 5g_high_latency_moderate
+    name: "5G High Latency, WiFi Normal"
+    description: "5G 50M/100ms/0.2% loss, WiFi 50M/10ms/0.2% loss — latency-aware steering"
+    line_a:
+      bandwidth_kbit: 50000
+      delay_ms: 100
+      loss_pct: 0.2
+    line_b:
+      bandwidth_kbit: 50000
+      delay_ms: 10
+      loss_pct: 0.2
+
+  - id: wifi_high_latency_moderate
+    name: "WiFi High Latency, 5G Normal"
+    description: "WiFi 50M/100ms/0.2% loss, 5G 50M/10ms/0.2% loss — latency-aware steering"
+    line_a:
+      bandwidth_kbit: 50000
+      delay_ms: 10
+      loss_pct: 0.2
+    line_b:
+      bandwidth_kbit: 50000
+      delay_ms: 100
+      loss_pct: 0.2
+
+  # ── 9. Asymmetric — Mixed Impairment ────────────────────────
+
+  - id: asymmetric_mixed_moderate
+    name: "Asymmetric — 5G Latency + WiFi Loss"
+    description: "5G 40M/80ms/0.2% loss, WiFi 40M/20ms/1.5% loss — mixed stress"
+    line_a:
+      bandwidth_kbit: 40000
+      delay_ms: 80
+      loss_pct: 0.2
+    line_b:
+      bandwidth_kbit: 40000
+      delay_ms: 20
+      loss_pct: 1.5
+
+  # ── 10-11. Periodic Disconnect ──────────────────────────────
+
+  - id: 5g_disconnect_visible
+    name: "5G Periodic Disconnect"
+    description: "5G disconnects 5s every 25s (x5), WiFi 50M clean — failover test"
+    line_a:
+      bandwidth_kbit: 50000
+      delay_ms: 0
+      loss_pct: 0
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 5
+        interval_s: 25
+        repeat: 5
+    line_b:
+      bandwidth_kbit: 50000
+
+  - id: wifi_disconnect_visible
+    name: "WiFi Periodic Disconnect"
+    description: "WiFi disconnects 5s every 25s (x5), 5G 50M clean — failover test"
+    line_a:
+      bandwidth_kbit: 50000
+    line_b:
+      bandwidth_kbit: 50000
+      delay_ms: 0
+      loss_pct: 0
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 5
+        interval_s: 25
+        repeat: 5
+
+  # ── 12-13. Intermittent Flap ────────────────────────────────
+
+  - id: 5g_intermittent_visible
+    name: "5G Intermittent Flap"
+    description: "5G flaps 2s every 15s (x10), WiFi 50M clean — flap resilience"
+    line_a:
+      bandwidth_kbit: 50000
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 2
+        interval_s: 15
+        repeat: 10
+    line_b:
+      bandwidth_kbit: 50000
+
+  - id: wifi_intermittent_visible
+    name: "WiFi Intermittent Flap"
+    description: "WiFi flaps 2s every 15s (x10), 5G 50M clean — flap resilience"
+    line_a:
+      bandwidth_kbit: 50000
+    line_b:
+      bandwidth_kbit: 50000
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 2
+        interval_s: 15
+        repeat: 10
+
+  # ── 14-15. Dynamic Variation ────────────────────────────────
+
+  - id: wifi_interference_moderate
+    name: "WiFi Interference — Dynamic"
+    description: "WiFi 20~50M/10~40ms/0~0.8% loss fluctuating, 5G 50M stable"
+    line_a:
+      bandwidth_kbit: 50000
+    line_b:
+      bandwidth_kbit: 35000
+      delay_ms: 25
+      loss_pct: 0.4
       variation:
-        delay_range_ms: 10
-        jitter_range_ms: 15
-        loss_range_pct: 1.0
-        bw_range_kbit: 20000
+        bw_range_kbit: 15000
+        delay_range_ms: 15
+        loss_range_pct: 0.4
         interval_s: 3
 
-  - id: both_varied
+  - id: both_varied_moderate
     name: "Both Lines Dynamic Variation"
-    description: "Both lines fluctuating independently — stress test ATSSS splitting"
+    description: "5G 30~50M/20~60ms/0~0.5%, WiFi 20~40M/10~30ms/0~1% — stress test"
     line_a:
-      bandwidth_kbit: 50000
-      delay_ms: 30
-      jitter_ms: 15
-      loss_pct: 1.0
+      bandwidth_kbit: 40000
+      delay_ms: 40
+      loss_pct: 0.25
       variation:
+        bw_range_kbit: 10000
         delay_range_ms: 20
-        jitter_range_ms: 10
-        loss_range_pct: 1.0
-        bw_range_kbit: 20000
+        loss_range_pct: 0.25
         interval_s: 5
     line_b:
       bandwidth_kbit: 30000
       delay_ms: 20
-      jitter_ms: 10
-      loss_pct: 2.0
+      loss_pct: 0.5
       variation:
-        delay_range_ms: 15
-        jitter_range_ms: 10
-        loss_range_pct: 1.5
-        bw_range_kbit: 15000
+        bw_range_kbit: 10000
+        delay_range_ms: 10
+        loss_range_pct: 0.5
         interval_s: 3
+
+  # ════════════════════════════════════════════════════════════════
+  #  黃金場景 — Golden Scenario Profiles (6)
+  # ════════════════════════════════════════════════════════════════
+
+  # ── A1. Balanced Aggregation ────────────────────────────────
+
+  - id: golden_balanced_aggregation
+    name: "A1: Balanced Aggregation"
+    description: "5G 60M/25ms/0.1%, WiFi 60M/10ms/0.1% — equal-weight bonding baseline"
+    line_a:
+      bandwidth_kbit: 60000
+      delay_ms: 25
+      loss_pct: 0.1
+    line_b:
+      bandwidth_kbit: 60000
+      delay_ms: 10
+      loss_pct: 0.1
+
+  # ── A2. Weighted Aggregation ────────────────────────────────
+
+  - id: golden_weighted_aggregation
+    name: "A2: Weighted Aggregation (2:1 5G bias)"
+    description: "5G 80M/30ms/0.2%, WiFi 40M/10ms/0.2% — 2:1 weighted bonding"
+    line_a:
+      bandwidth_kbit: 80000
+      delay_ms: 30
+      loss_pct: 0.2
+    line_b:
+      bandwidth_kbit: 40000
+      delay_ms: 10
+      loss_pct: 0.2
+
+  # ── B1. Hard Failover ───────────────────────────────────────
+
+  - id: golden_hard_failover
+    name: "B1: Hard Failover"
+    description: "5G 50M/20ms with 3s disconnect every 20s (x5), WiFi 50M/10ms clean"
+    line_a:
+      bandwidth_kbit: 50000
+      delay_ms: 20
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 3
+        interval_s: 20
+        repeat: 5
+    line_b:
+      bandwidth_kbit: 50000
+      delay_ms: 10
+
+  # ── B2. Intermittent Flap (10 min) ──────────────────────────
+
+  - id: golden_intermittent_flap
+    name: "B2: Intermittent Flap (10 min)"
+    description: "5G 50M with 2s flap every 15s (x40), WiFi 50M clean — long-duration flap"
+    line_a:
+      bandwidth_kbit: 50000
+      disconnect_schedule:
+        enabled: true
+        disconnect_s: 2
+        interval_s: 15
+        repeat: 40
+    line_b:
+      bandwidth_kbit: 50000
+
+  # ── C1. Loss Protection ─────────────────────────────────────
+
+  - id: golden_loss_protection
+    name: "C1: Loss Protection"
+    description: "5G 40M/35ms/2% loss, WiFi 40M/12ms/0.2% loss — duplicate mode trigger"
+    line_a:
+      bandwidth_kbit: 40000
+      delay_ms: 35
+      loss_pct: 2.0
+    line_b:
+      bandwidth_kbit: 40000
+      delay_ms: 12
+      loss_pct: 0.2
+
+  # ── C2. Burst Loss ──────────────────────────────────────────
+
+  - id: golden_burst_loss
+    name: "C2: Burst Loss"
+    description: "5G 50M/10ms with 0~10% fluctuating loss, WiFi 50M clean"
+    line_a:
+      bandwidth_kbit: 50000
+      delay_ms: 10
+      loss_pct: 5.0
+      variation:
+        loss_range_pct: 5.0
+        interval_s: 5
+    line_b:
+      bandwidth_kbit: 50000

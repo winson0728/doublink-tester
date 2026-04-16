@@ -1,49 +1,49 @@
 matrix:
   - id: "bonding_clean_tcp"
     mode: bonding
-    network_condition: clean
+    network_condition: clean_controlled
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
+      min_throughput_mbps: 10.0
 
   - id: "duplicate_clean_tcp"
     mode: duplicate
-    network_condition: clean
+    network_condition: clean_controlled
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
+      min_throughput_mbps: 10.0
 
   - id: "realtime_clean_tcp"
     mode: real_time
-    network_condition: clean
+    network_condition: clean_controlled
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
+      min_throughput_mbps: 10.0
 
   - id: "bonding_symmetric_loss_http"
     mode: bonding
-    network_condition: symmetric_loss
+    network_condition: symmetric_mild_loss
     traffic: http_load
     assertions:
       min_success_rate: 0.90
 
   - id: "duplicate_symmetric_loss_http"
     mode: duplicate
-    network_condition: symmetric_loss
+    network_condition: symmetric_mild_loss
     traffic: http_load
     assertions:
       min_success_rate: 0.90
 
   - id: "bonding_5g_degraded_tcp"
     mode: bonding
-    network_condition: 5g_degraded
+    network_condition: 5g_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 1.0
+      min_throughput_mbps: 5.0
 
   - id: "bonding_wifi_degraded_tcp"
     mode: bonding
-    network_condition: wifi_degraded
+    network_condition: wifi_degraded_moderate
     traffic: tcp_throughput
     assertions:
-      min_throughput_mbps: 0.5
+      min_throughput_mbps: 5.0

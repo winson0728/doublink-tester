@@ -25,17 +25,17 @@ for f in sorted(glob.glob(f"{results_dir}/*_tcp.json")):
 # Parse UDP server text output
 udp_data = {}
 file_to_profile = {
-    "01_clean": "clean",
-    "02_symmetric_loss": "symmetric_loss",
-    "03_symmetric_latency": "symmetric_latency",
-    "04_symmetric_congested": "symmetric_congested",
-    "05_5g_degraded": "5g_degraded",
-    "06_wifi_degraded": "wifi_degraded",
-    "07_5g_high_latency": "5g_high_latency",
-    "08_wifi_high_latency": "wifi_high_latency",
-    "09_asymmetric_mixed": "asymmetric_mixed",
-    "10_wifi_interference": "wifi_interference",
-    "11_both_varied": "both_varied",
+    "01_clean_controlled": "clean_controlled",
+    "02_symmetric_mild_loss": "symmetric_mild_loss",
+    "03_symmetric_mild_latency": "symmetric_mild_latency",
+    "04_congested_recoverable": "congested_recoverable",
+    "05_5g_degraded_moderate": "5g_degraded_moderate",
+    "06_wifi_degraded_moderate": "wifi_degraded_moderate",
+    "07_5g_high_latency_moderate": "5g_high_latency_moderate",
+    "08_wifi_high_latency_moderate": "wifi_high_latency_moderate",
+    "09_asymmetric_mixed_moderate": "asymmetric_mixed_moderate",
+    "10_wifi_interference_moderate": "wifi_interference_moderate",
+    "11_both_varied_moderate": "both_varied_moderate",
 }
 
 for f in sorted(glob.glob(f"{results_dir}/*_udp_sv.json")):
@@ -99,10 +99,10 @@ for f in sorted(glob.glob(f"{results_dir}/*_udp_sv.json")):
 
 # Print combined table
 all_profiles = [
-    "clean", "symmetric_loss", "symmetric_latency", "symmetric_congested",
-    "5g_degraded", "wifi_degraded", "5g_high_latency", "wifi_high_latency",
-    "asymmetric_mixed", "5g_disconnect", "wifi_disconnect",
-    "5g_intermittent", "wifi_intermittent", "wifi_interference", "both_varied",
+    "clean_controlled", "symmetric_mild_loss", "symmetric_mild_latency", "congested_recoverable",
+    "5g_degraded_moderate", "wifi_degraded_moderate", "5g_high_latency_moderate", "wifi_high_latency_moderate",
+    "asymmetric_mixed_moderate", "5g_disconnect_visible", "wifi_disconnect_visible",
+    "5g_intermittent_visible", "wifi_intermittent_visible", "wifi_interference_moderate", "both_varied_moderate",
 ]
 
 hdr = f"{'Profile':<25} {'TCP(Mbps)':>12} {'Retrans':>10} {'UDP Recv(Mbps)':>15} {'UDP Loss%':>10} {'Jitter(ms)':>10}"

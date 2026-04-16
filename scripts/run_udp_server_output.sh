@@ -31,95 +31,95 @@ run_udp() {
 
 echo ""
 
-echo "[1/11] clean"
+echo "[1/11] clean_controlled"
 clear_rules
-run_udp "01_clean" "50M"
+run_udp "01_clean_controlled" "50M"
 
-echo "[2/11] symmetric_loss"
+echo "[2/11] symmetric_mild_loss"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":20,"jitter_ms":5,"loss_pct":2.0}'
 sleep 3
-run_udp "02_symmetric_loss"
+run_udp "02_symmetric_mild_loss"
 
-echo "[3/11] symmetric_latency"
+echo "[3/11] symmetric_mild_latency"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":30,"loss_pct":0.5}'
 sleep 3
-run_udp "03_symmetric_latency"
+run_udp "03_symmetric_mild_latency"
 
-echo "[4/11] symmetric_congested"
+echo "[4/11] congested_recoverable"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":1000,"delay_ms":200,"jitter_ms":100,"loss_pct":5.0,"corrupt_pct":0.5}'
 sleep 3
-run_udp "04_symmetric_congested"
+run_udp "04_congested_recoverable"
 
-echo "[5/11] 5g_degraded"
+echo "[5/11] 5g_degraded_moderate"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 sleep 3
-run_udp "05_5g_degraded"
+run_udp "05_5g_degraded_moderate"
 
-echo "[6/11] wifi_degraded"
+echo "[6/11] wifi_degraded_moderate"
 clear_rules
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":5000,"delay_ms":80,"jitter_ms":40,"loss_pct":5.0,"corrupt_pct":0.2}'
 sleep 3
-run_udp "06_wifi_degraded"
+run_udp "06_wifi_degraded_moderate"
 
-echo "[7/11] 5g_high_latency"
+echo "[7/11] 5g_high_latency_moderate"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 sleep 3
-run_udp "07_5g_high_latency"
+run_udp "07_5g_high_latency_moderate"
 
-echo "[8/11] wifi_high_latency"
+echo "[8/11] wifi_high_latency_moderate"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"jitter_ms":2,"loss_pct":0}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":300,"jitter_ms":50,"loss_pct":0.5}'
 sleep 3
-run_udp "08_wifi_high_latency"
+run_udp "08_wifi_high_latency_moderate"
 
-echo "[9/11] asymmetric_mixed"
+echo "[9/11] asymmetric_mixed_moderate"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":40,"loss_pct":0.5}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":20000,"delay_ms":200,"jitter_ms":40,"loss_pct":0.5}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"jitter_ms":5,"loss_pct":5.0}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":10,"jitter_ms":5,"loss_pct":5.0}'
 sleep 3
-run_udp "09_asymmetric_mixed"
+run_udp "09_asymmetric_mixed_moderate"
 
-echo "[10/11] wifi_interference"
+echo "[10/11] wifi_interference_moderate"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"loss_pct":0}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":100000,"delay_ms":5,"loss_pct":0}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":15,"jitter_ms":0,"loss_pct":1.5,"variation":{"enabled":true,"delay_range_ms":10,"jitter_range_ms":15,"loss_range_pct":1.0,"bandwidth_range_kbit":20000,"interval_s":3}}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":15,"jitter_ms":0,"loss_pct":1.5,"variation":{"enabled":true,"delay_range_ms":10,"jitter_range_ms":15,"loss_range_pct":1.0,"bandwidth_range_kbit":20000,"interval_s":3}}'
 sleep 3
-run_udp "10_wifi_interference"
+run_udp "10_wifi_interference_moderate"
 
-echo "[11/11] both_varied"
+echo "[11/11] both_varied_moderate"
 clear_rules
 apply_rule '{"interface":"wan_a_in","direction":"egress","bandwidth_kbit":50000,"delay_ms":30,"jitter_ms":0,"loss_pct":1.0,"variation":{"enabled":true,"delay_range_ms":20,"jitter_range_ms":15,"loss_range_pct":0.5,"bandwidth_range_kbit":20000,"interval_s":5}}'
 apply_rule '{"interface":"lan_a_out","direction":"egress","bandwidth_kbit":50000,"delay_ms":30,"jitter_ms":0,"loss_pct":1.0,"variation":{"enabled":true,"delay_range_ms":20,"jitter_range_ms":15,"loss_range_pct":0.5,"bandwidth_range_kbit":20000,"interval_s":5}}'
 apply_rule '{"interface":"wan_b_in","direction":"egress","bandwidth_kbit":30000,"delay_ms":20,"jitter_ms":0,"loss_pct":2.0,"variation":{"enabled":true,"delay_range_ms":15,"jitter_range_ms":10,"loss_range_pct":1.0,"bandwidth_range_kbit":15000,"interval_s":5}}'
 apply_rule '{"interface":"lan_b_out","direction":"egress","bandwidth_kbit":30000,"delay_ms":20,"jitter_ms":0,"loss_pct":2.0,"variation":{"enabled":true,"delay_range_ms":15,"jitter_range_ms":10,"loss_range_pct":1.0,"bandwidth_range_kbit":15000,"interval_s":5}}'
 sleep 3
-run_udp "11_both_varied"
+run_udp "11_both_varied_moderate"
 
 echo ""
 echo "Cleanup..."
