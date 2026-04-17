@@ -166,27 +166,35 @@ class TestDisconnectSchedule:
 @allure.epic("Multilink Verification")
 @allure.feature("Network Degradation")
 class TestTcpThroughputDegradation:
-    """Measure TCP throughput under degraded network conditions (both lines)."""
+    """Measure TCP throughput under degraded network conditions — all 3 ATSSS modes."""
 
     @pytest.mark.degradation
     @pytest.mark.slow
+    @pytest.mark.parametrize("mode_id", ["real_time", "bonding", "duplicate"])
     @allure.story("TCP Throughput Under Degradation")
-    async def test_tcp_baseline_clean(self, iperf3_runner):
-        """Establish TCP throughput baseline with clean network."""
-        allure.dynamic.title("TCP baseline — clean network")
+    async def test_tcp_baseline_clean(self, mode_id: str, set_multilink_mode, iperf3_runner):
+        """Establish TCP throughput baseline with clean network for each ATSSS mode."""
+        allure.dynamic.title(f"TCP baseline — clean network [{mode_id}]")
+
+        await set_multilink_mode(mode_id)
 
         result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
 
         allure.attach(
-            json.dumps({"throughput_mbps": result.throughput_mbps, "loss_pct": result.loss_pct}, indent=2),
-            name="tcp_baseline.json",
+            json.dumps({
+                "mode": mode_id,
+                "throughput_mbps": result.throughput_mbps,
+                "loss_pct": result.loss_pct,
+            }, indent=2),
+            name=f"tcp_baseline_{mode_id}.json",
             attachment_type=allure.attachment_type.JSON,
         )
 
-        assert result.throughput_mbps > 0, "No throughput measured"
+        assert result.throughput_mbps > 0, f"No throughput measured in {mode_id} mode"
 
     @pytest.mark.degradation
     @pytest.mark.slow
+    @pytest.mark.parametrize("mode_id", ["real_time", "bonding", "duplicate"])
     @pytest.mark.parametrize("condition,min_throughput_mbps", [
         ("symmetric_mild_loss", 2.0),
         ("symmetric_mild_latency", 1.0),
@@ -198,31 +206,36 @@ class TestTcpThroughputDegradation:
     @allure.story("TCP Throughput Under Degradation")
     async def test_tcp_under_degradation(
         self,
+        mode_id: str,
         condition: str,
         min_throughput_mbps: float,
+        set_multilink_mode,
         apply_network_condition,
         iperf3_runner,
     ):
-        """Verify TCP throughput stays above minimum under degraded conditions."""
-        allure.dynamic.title(f"TCP throughput — {condition}")
+        """Verify TCP throughput stays above minimum under degraded conditions for each ATSSS mode."""
+        allure.dynamic.title(f"TCP throughput — {condition} [{mode_id}]")
 
+        await set_multilink_mode(mode_id)
         await apply_network_condition(condition)
 
         result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
 
         allure.attach(
             json.dumps({
+                "mode": mode_id,
                 "condition": condition,
                 "throughput_mbps": result.throughput_mbps,
                 "loss_pct": result.loss_pct,
                 "min_required_mbps": min_throughput_mbps,
             }, indent=2),
-            name=f"tcp_{condition}.json",
+            name=f"tcp_{condition}_{mode_id}.json",
             attachment_type=allure.attachment_type.JSON,
         )
 
         assert result.throughput_mbps >= min_throughput_mbps, (
-            f"TCP throughput {result.throughput_mbps:.2f} Mbps below minimum {min_throughput_mbps} Mbps"
+            f"[{mode_id}] TCP throughput {result.throughput_mbps:.2f} Mbps below minimum "
+            f"{min_throughput_mbps} Mbps under {condition}"
         )
 
 
