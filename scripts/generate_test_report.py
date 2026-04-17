@@ -29,7 +29,8 @@ def set_cell_bg(cell, rgb: RGBColor):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
     shd = OxmlElement('w:shd')
-    hex_color = f"{rgb.red:02X}{rgb.green:02X}{rgb.blue:02X}"
+    # RGBColor is a tuple (r, g, b) in newer python-docx
+    hex_color = f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
     shd.set(qn('w:val'), 'clear')
     shd.set(qn('w:color'), 'auto')
     shd.set(qn('w:fill'), hex_color)
