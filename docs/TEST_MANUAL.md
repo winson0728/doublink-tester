@@ -1,6 +1,6 @@
 # Doublink 自動化測試使用手冊
 
-> 版本：1.0 | 適用對象：網路/5G 工程師 | 環境：ATSSS 5G+WiFi Multilink
+> 版本：1.1 | 適用對象：網路/5G 工程師 | 環境：ATSSS 5G+WiFi Multilink
 
 ---
 
@@ -101,7 +101,7 @@ cd ~/doublink-tester
 export PATH=$HOME/.local/bin:$PATH
 ```
 
-### 3.3 執行全套測試（52 個測項）
+### 3.3 執行全套測試（74 個測項）
 
 ```bash
 # 方式一：使用 run_tests.sh（建議）
@@ -110,13 +110,13 @@ export PATH=$HOME/.local/bin:$PATH
 # 方式二：直接用 pytest
 PYTHONPATH=src:$PYTHONPATH pytest \
   tests/test_mode_switching/ \
-  tests/test_degradation/test_throughput_degradation.py \
+  tests/test_degradation/ \
   tests/test_golden_scenarios/ \
   tests/test_link_weight/ \
   -v --timeout=600 --alluredir=allure-results
 ```
 
-預期執行時間：**約 16 分鐘**
+預期執行時間：**約 30 分鐘**（TCP 劣化測試現為 21 項 × 3 種模式，各 10s 量測）
 
 ### 3.4 查看快速結果摘要
 
@@ -155,15 +155,25 @@ recovery_pct = (after_switch_mbps / baseline_mbps) × 100
 
 **包含子類別：**
 
-| 子類別 | 說明 |
-|--------|------|
-| `TestNetworkConditionApplied` | 驗證 profile 有正確套用到 NetEmu（4 條規則） |
-| `TestDegradationWithVariation` | 驗證動態變化 profile（variation_enabled） |
-| `TestDisconnectSchedule` | 驗證週期斷線 schedule 已設定 |
-| `TestTcpThroughputDegradation` | 在各 profile 下量測 TCP 吞吐量 |
-| `TestUdpDegradation` | 在各 profile 下量測 UDP 吞吐量與 Jitter |
-| `TestSteeringBehaviour` | 驗證 ATSSS 能自動導向較佳路徑 |
-| `TestRecoveryAfterDegradation` | 移除劣化後流量能否快速恢復 |
+**`test_throughput_degradation.py`（41 項）：**
+
+| 子類別 | 項數 | 說明 |
+|--------|------|------|
+| `TestNetworkConditionApplied` | 6 | 驗證 profile 有正確套用到 NetEmu（4 條規則） |
+| `TestDegradationWithVariation` | 2 | 驗證動態變化 profile（variation_enabled） |
+| `TestDisconnectSchedule` | 2 | 驗證週期斷線 schedule 已設定 |
+| `TestTcpThroughputDegradation` | **21** | TCP 基準 × 3 模式（3 項）+ 6 劣化條件 × 3 模式（18 項）— Allure 標題含 `[real_time/bonding/duplicate]` |
+| `TestUdpDegradation` | 5 | 在各 profile 下量測 UDP 吞吐量與 Jitter |
+| `TestSteeringBehaviour` | 4 | 驗證 ATSSS 能自動導向較佳路徑 |
+| `TestRecoveryAfterDegradation` | 1 | 移除劣化後流量能否快速恢復 |
+
+**`test_failover.py`（8 項）：**
+
+| 子類別 | 項數 | 說明 |
+|--------|------|------|
+| `TestLinkDisconnectFailover` | 4 | 5G/WiFi 完全斷線後 ATSSS 自動切換至存活線路 |
+| `TestIntermittentDisconnect` | 3 | 間歇斷線（每 15s 斷 2s）下 duplicate 模式存活驗證 |
+| `TestRecoveryAfterDisconnect` | 1 | 斷線解除後吞吐量恢復驗證 |
 
 ---
 
@@ -210,8 +220,11 @@ export PATH=$HOME/.local/bin:$PATH
 # 只跑黃金場景
 PYTHONPATH=src:$PYTHONPATH pytest tests/test_golden_scenarios/ -v --timeout=600 --alluredir=allure-results
 
-# 只跑劣化測試
-PYTHONPATH=src:$PYTHONPATH pytest tests/test_degradation/test_throughput_degradation.py -v
+# 只跑劣化測試（含 failover）
+PYTHONPATH=src:$PYTHONPATH pytest tests/test_degradation/ -v
+
+# 只跑 TCP 劣化（21 項，含三模式）
+PYTHONPATH=src:$PYTHONPATH pytest tests/test_degradation/test_throughput_degradation.py::TestTcpThroughputDegradation -v
 
 # 只跑連結權重
 ./scripts/run_tests.sh link_weight
@@ -349,7 +362,7 @@ ssh -L 8888:localhost:8888 ataya@192.168.105.210
 allure-results/
 ├── xxxxxxxx-result.json    ← 每個測項的結果（含附加的 JSON 數據）
 ├── xxxxxxxx-attachment.json ← 流量量測數據（throughput_mbps, loss_pct 等）
-└── ...（共 ~52 個測項）
+└── ...（共 ~74 個測項）
 ```
 
 每個 `*-result.json` 包含：
