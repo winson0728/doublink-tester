@@ -312,25 +312,35 @@ FAILED [ 42%]  → 測項失敗，查看 FAILURES 區塊取得詳情
 ```bash
 cd ~/doublink-tester
 
-# 安裝 allure（僅需一次）
-# 方式一：npm（推薦）
-npm install -g allure-commandline
+# ── 安裝 allure（僅需一次，使用 Java binary） ──────────────────
+# 步驟 1：安裝 Java（如果還沒安裝）
+echo ataya | sudo -S apt-get install -y default-jre-headless
 
-# 方式二：下載 binary
-wget https://github.com/allure-framework/allure2/releases/download/2.29.0/allure-2.29.0.tgz
+# 步驟 2：下載並安裝 allure binary
+cd /tmp
+wget -q https://github.com/allure-framework/allure2/releases/download/2.29.0/allure-2.29.0.tgz
 tar xzf allure-2.29.0.tgz
-sudo ln -s $(pwd)/allure-2.29.0/bin/allure /usr/local/bin/allure
+echo ataya | sudo -S mv allure-2.29.0 /opt/allure
+echo ataya | sudo -S ln -sf /opt/allure/bin/allure /usr/local/bin/allure
+allure --version    # 應顯示 2.29.0
+cd ~/doublink-tester
 
-# 產生靜態報表
+# ── 產生 HTML 報表 ────────────────────────────────────────────
 allure generate allure-results -o allure-report --clean
+# 輸出：Report successfully generated to allure-report
 
-# 用 HTTP server 查看（在執行機上）
-cd allure-report && python3 -m http.server 8888
+# ── 啟動 HTTP server 查看（在執行機上） ───────────────────────
+cd ~/doublink-tester/allure-report
+python3 -m http.server 8888 &
+# 報表已在 http://192.168.105.210:8888/ 提供
 
-# 在本機瀏覽器開啟（需要 SSH port forward）
+# ── 在本機瀏覽器開啟（需要 SSH port forward） ─────────────────
 # 在本機執行：
 ssh -L 8888:localhost:8888 ataya@192.168.105.210
 # 然後瀏覽器開啟 http://localhost:8888
+
+# ⚠️ 注意：不要用 npm install -g allure-commandline
+#    系統 Node.js 版本（12.x）太舊，需要 14+，會出現 MODULE_NOT_FOUND 錯誤
 ```
 
 ### 6.4 測試結果資料夾結構
