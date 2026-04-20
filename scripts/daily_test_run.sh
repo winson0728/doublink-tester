@@ -10,7 +10,8 @@
 #   http://192.168.105.210:8888/        → HTML 報告 Web 存取
 # =============================================================================
 
-set -euo pipefail
+set -eo pipefail
+# 注意：不用 -u，避免 PYTHONPATH 等環境變數未設時報錯
 
 # ── 路徑設定 ─────────────────────────────────────────────────────
 PROJ_DIR="$HOME/doublink-tester"
@@ -58,7 +59,7 @@ ok "allure-results 已清除"
 # ── Step 3: 執行 pytest ───────────────────────────────────────────
 log "Step 3/6: 執行全套測試（74 項，預計 ~30 分鐘）..."
 PYTEST_EXIT=0
-PYTHONPATH="$PROJ_DIR/src:$PYTHONPATH" \
+PYTHONPATH="$PROJ_DIR/src:${PYTHONPATH:-}" \
 $PYTHON -m pytest \
   tests/test_mode_switching/ \
   tests/test_degradation/ \
@@ -71,9 +72,11 @@ $PYTHON -m pytest \
   2>&1 | tee -a "$LOG_FILE" || PYTEST_EXIT=$?
 
 # 解析測試結果
-PASSED=$(grep -oP '\d+(?= passed)' "$LOG_FILE" | tail -1 || echo "?")
-FAILED=$(grep -oP '\d+(?= failed)' "$LOG_FILE" | tail -1 || echo "0")
-TOTAL=$(( ${PASSED:-0} + ${FAILED:-0} ))
+PASSED=$(grep -oP '\d+(?= passed)' "$LOG_FILE" | tail -1 || true)
+FAILED=$(grep -oP '\d+(?= failed)' "$LOG_FILE" | tail -1 || true)
+PASSED=${PASSED:-0}
+FAILED=${FAILED:-0}
+TOTAL=$(( PASSED + FAILED ))
 
 if [ "$PYTEST_EXIT" -eq 0 ]; then
   ok "pytest 完成：${PASSED}/${TOTAL} PASSED"
@@ -96,7 +99,7 @@ fi
 # ── Step 5: 生成 Word 報告 ────────────────────────────────────────
 log "Step 5/6: 生成 Word 測試報告..."
 WORD_EXIT=0
-PYTHONPATH="$PROJ_DIR/src:$PYTHONPATH" \
+PYTHONPATH="$PROJ_DIR/src:${PYTHONPATH:-}" \
 $PYTHON scripts/generate_test_report.py \
   "$PROJ_DIR/allure-results" \
   "$REPORT_DOCX" 2>&1 | tee -a "$LOG_FILE" || WORD_EXIT=$?
