@@ -380,6 +380,9 @@ async def get_netemu_rules():
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{NETEMU_URL}/api/rules")
+            text = resp.text.strip()
+            if not text:
+                return []
             return resp.json()
     except Exception as e:
         raise HTTPException(503, f"NetEmu unreachable: {e}")
@@ -390,7 +393,8 @@ async def clear_netemu_rules():
     cleared = []
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            rules = (await client.get(f"{NETEMU_URL}/api/rules")).json()
+            r = await client.get(f"{NETEMU_URL}/api/rules")
+            rules = r.json() if r.text.strip() else []
             for rule in rules:
                 rid = rule.get("id")
                 if rid:
