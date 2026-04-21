@@ -18,6 +18,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import importlib.util
+
 import uvicorn
 import yaml
 from fastapi import FastAPI, HTTPException
@@ -31,6 +33,31 @@ REPORTS_DIR   = PROJ_DIR / "reports"
 REPORT_SCRIPT = PROJ_DIR / "scripts" / "generate_test_report.py"
 PROFILES_YAML = PROJ_DIR / "config" / "profiles" / "network_conditions.yaml"
 NETEMU_URL    = "http://192.168.105.115:8080"
+
+# ── Dynamic import: reuse parse_allure_results from generate_test_report.py ──
+def _load_parse_allure():
+    try:
+        spec = importlib.util.spec_from_file_location("_rpt", REPORT_SCRIPT)
+        mod  = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.parse_allure_results
+    except Exception:
+        return None
+
+_parse_allure_results = _load_parse_allure()
+
+
+def parse_allure_for_ui() -> dict[str, dict]:
+    """Return {tid: {status, **metrics}} from current allure-results dir.
+    Strips the internal 'start' timestamp before returning."""
+    if _parse_allure_results is None:
+        return {}
+    try:
+        raw = _parse_allure_results(str(RESULTS_DIR))
+        return {tid: {k: v for k, v in d.items() if k != "start"} for tid, d in raw.items()}
+    except Exception:
+        return {}
+
 
 LINE_IFACES = {
     "a_dl": "wan_a_in",
@@ -198,6 +225,8 @@ async def run_pytest_task(run_id: str, nodes: list[str]):
         run["lines"].append(f"[ERROR] {e}")
         run["exit_code"] = -1
     finally:
+        # Parse allure-results to get actual measured metrics
+        run["metrics"] = parse_allure_for_ui()
         run["status"] = "done"
         run["end"] = datetime.now().isoformat(timespec="seconds")
         current_run_id = None
@@ -239,7 +268,7 @@ async def stream_output(run_id: str):
                 yield f"data: {json.dumps({'line': line})}\n\n"
             sent = len(run["lines"])
             if run["status"] == "done":
-                yield f"data: {json.dumps({'done':True,'passed':run['passed'],'failed':run['failed'],'results':run['results'],'exit_code':run.get('exit_code',-1)})}\n\n"
+                yield f"data: {json.dumps({'done':True,'passed':run['passed'],'failed':run['failed'],'results':run['results'],'metrics':run.get('metrics',{}),'exit_code':run.get('exit_code',-1)})}\n\n"
                 break
             await asyncio.sleep(0.4)
     return StreamingResponse(gen(), media_type="text/event-stream",
@@ -281,6 +310,12 @@ async def generate_report(run_id: str):
         shutil.copy(out, allure_rep / "doublink_test_report_latest.docx")
     return {"ok": True, "file": out.name,
             "download": f"http://192.168.105.210:8888/{out.name}"}
+
+
+@app.get("/api/results")
+async def get_allure_results():
+    """Return current allure-results parsed metrics for all tests."""
+    return parse_allure_for_ui()
 
 
 # ── Profile routes ────────────────────────────────────────────────
@@ -503,6 +538,9 @@ header h1{font-size:16px;font-weight:700;color:var(--accent)}
 .result-table tr.pass td:first-child{border-left:3px solid var(--pass)}
 .result-table tr.fail td:first-child{border-left:3px solid var(--fail)}
 .result-table tr.pending td{color:var(--muted)}
+.metric-cell{font-size:11px;color:#a0c4e8;font-family:monospace;white-space:nowrap}
+.metric-cell.fail{color:#ff9999}
+.metric-cell.pass{color:#9ee89e}
 .chip{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
 .chip.A{background:rgba(74,144,217,.15);color:var(--A)}
 .chip.B{background:rgba(224,123,57,.15);color:var(--B)}
@@ -617,12 +655,13 @@ header h1{font-size:16px;font-weight:700;color:var(--accent)}
           <div class="summary-card fail"><div class="val" id="r-fail">—</div><div class="lbl">FAIL ❌</div></div>
         </div>
         <table class="result-table">
-          <thead><tr><th>Test ID</th><th>群組</th><th>測項名稱</th><th>狀態</th></tr></thead>
+          <thead><tr><th>Test ID</th><th>群組</th><th>測項名稱</th><th>狀態</th><th>實測數值</th></tr></thead>
           <tbody id="result-tbody"></tbody>
         </table>
       </div>
       <div class="report-bar">
         <span class="msg" id="report-msg">執行完成後可生成 Word 報告</span>
+        <button class="btn-sm" onclick="refreshMetrics()">🔄 刷新數值</button>
         <button class="btn-sm" id="btn-report" onclick="generateReport()" disabled>📄 生成 Word 報告</button>
         <a id="report-link" href="#" style="display:none" class="btn-sm" target="_blank">⬇ 下載</a>
       </div>
@@ -769,6 +808,9 @@ function onRunDone(data) {
   document.getElementById('prog-msg').textContent = data.exit_code===0 ? `✅ 全部通過 ${data.passed}/${data.passed+data.failed}` : `❌ ${data.failed} 項失敗，${data.passed} 項通過`;
   document.getElementById('btn-report').disabled = false;
   Object.entries(data.results).forEach(([tid,st])=>updateResultIcon(tid,st));
+  if (data.metrics && Object.keys(data.metrics).length > 0) {
+    applyMetricsToTable(data.metrics);
+  }
   appendLine('',''); appendLine(`═══ 完成：${data.passed} PASSED  ${data.failed} FAILED ═══`, data.failed>0?'fail':'pass');
   switchTab('results');
 }
@@ -779,6 +821,86 @@ async function stopRun() {
   setRunning(false); appendLine('[STOPPED]','warn');
 }
 
+// ── Metric formatting ─────────────────────────────────────────────
+function fmtMetrics(tid, d) {
+  if (!d) return '—';
+  const f = v => (v != null && v !== undefined) ? parseFloat(v).toFixed(1) : '—';
+  // Mode switch continuity (A-01..A-06): baseline + after_switch
+  if (d.baseline_mbps != null && d.after_switch_mbps != null) {
+    const pct = d.baseline_mbps > 0 ? Math.round(d.after_switch_mbps/d.baseline_mbps*100)+'%' : '—';
+    return `基準 ${f(d.baseline_mbps)} → 後 ${f(d.after_switch_mbps)} Mbps (${pct})`;
+  }
+  // Failover disconnect (B-42, B-43): baseline + during_failover
+  if (d.baseline_mbps != null && d.during_failover_mbps != null) {
+    return `基準 ${f(d.baseline_mbps)} → 斷線中 ${f(d.during_failover_mbps)} Mbps`;
+  }
+  // Recovery (B-41): degraded + recovered
+  if (d.degraded_mbps != null) {
+    const ratio = d.degraded_mbps > 0 ? Math.round(d.recovered_mbps/d.degraded_mbps)+'×' : '—';
+    return `劣化 ${f(d.degraded_mbps)} → 恢復 ${f(d.recovered_mbps)} Mbps (${ratio})`;
+  }
+  // Recovery after disconnect (B-49)
+  if (d.during_disconnect_mbps != null) {
+    return `斷線 ${f(d.during_disconnect_mbps)} → 恢復 ${f(d.after_recovery_mbps)} Mbps`;
+  }
+  // Loss protection C-05: dup vs bonding
+  if (d.duplicate_throughput_mbps != null) {
+    return `dup ${f(d.duplicate_throughput_mbps)} / bond ${f(d.bonding_throughput_mbps)} Mbps`;
+  }
+  // Mode switch under load (A-10)
+  if (d.throughput_mbps != null && d.duration_s != null && d.protocol != null) {
+    return `${f(d.throughput_mbps)} Mbps (${f(d.duration_s,0)}s ${d.protocol})`;
+  }
+  // D-08/D-09 baseline comparison: {real_time, bonding, duplicate}
+  if (d.real_time != null || d.bonding != null) {
+    const rt   = typeof d.real_time  === 'number' ? f(d.real_time)  : f(d.real_time?.throughput_mbps);
+    const bond = typeof d.bonding    === 'number' ? f(d.bonding)    : f(d.bonding?.throughput_mbps);
+    const dup  = typeof d.duplicate  === 'number' ? f(d.duplicate)  : f(d.duplicate?.throughput_mbps);
+    return `rt ${rt} / bond ${bond} / dup ${dup} Mbps`;
+  }
+  // Generic: throughput + optional loss/jitter
+  if (d.throughput_mbps != null) {
+    let s = `${f(d.throughput_mbps)} Mbps`;
+    if (d.loss_pct != null && Math.abs(d.loss_pct) < 200) s += ` / ${f(d.loss_pct)}% loss`;
+    if (d.jitter_ms != null && d.jitter_ms > 0) s += ` / ${f(d.jitter_ms)}ms jitter`;
+    if (d.min_required_mbps != null) s += ` (门槛 ≥${f(d.min_required_mbps)})`;
+    return s;
+  }
+  return '—';
+}
+
+// ── Refresh metrics from allure-results (without re-running tests) ──
+async function refreshMetrics() {
+  const btn = event.currentTarget;
+  btn.textContent = '⏳';
+  try {
+    const res = await fetch('/api/results');
+    if (!res.ok) throw new Error('API error');
+    const metrics = await res.json();
+    applyMetricsToTable(metrics);
+    btn.textContent = '🔄 刷新數值';
+  } catch(e) {
+    btn.textContent = '❌ 失敗';
+    setTimeout(() => btn.textContent='🔄 刷新數值', 2000);
+  }
+}
+
+function applyMetricsToTable(metrics) {
+  Object.entries(metrics).forEach(([tid, data]) => {
+    const cell = document.getElementById(`mt-${tid}`);
+    if (!cell) return;
+    const text = fmtMetrics(tid, data);
+    cell.textContent = text;
+    const status = data.status;
+    cell.className = 'metric-cell' + (status==='failed' ? ' fail' : status==='passed' ? ' pass' : '');
+    // Also update status icon if row is still pending
+    const row = document.getElementById(`row-${tid}`);
+    if (row && row.className === 'pending') {
+      updateResultIcon(tid, status === 'passed' ? 'PASSED' : status === 'failed' ? 'FAILED' : null);
+    }
+  });
+}
+
 function initResultTable(ids) {
   const tbody = document.getElementById('result-tbody'); tbody.innerHTML='';
   document.getElementById('r-total').textContent=ids.length;
@@ -787,7 +909,7 @@ function initResultTable(ids) {
   ids.forEach(id => {
     const t=TESTS.find(t=>t.id===id); if(!t) return;
     const tr=document.createElement('tr'); tr.id=`row-${id}`; tr.className='pending';
-    tr.innerHTML=`<td><b>${id}</b></td><td><span class="chip ${t.group}">${t.group}</span></td><td>${t.name}</td><td class="status-pend" id="st-${id}">— 等待中</td>`;
+    tr.innerHTML=`<td><b>${id}</b></td><td><span class="chip ${t.group}">${t.group}</span></td><td>${t.name}</td><td class="status-pend" id="st-${id}">— 等待中</td><td class="metric-cell" id="mt-${id}">—</td>`;
     tbody.appendChild(tr);
   });
   document.getElementById('report-link').style.display='none';
