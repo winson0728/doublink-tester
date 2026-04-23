@@ -114,10 +114,10 @@ TESTS = [
     {"id":"B-34","group":"B","name":"UDP symmetric_mild_latency","node":"tests/test_degradation/test_throughput_degradation.py::TestUdpDegradation::test_udp_under_degradation[symmetric_mild_latency-60.0-200.0]"},
     {"id":"B-35","group":"B","name":"UDP wifi_interference_moderate","node":"tests/test_degradation/test_throughput_degradation.py::TestUdpDegradation::test_udp_under_degradation[wifi_interference_moderate-10.0-100.0]"},
     {"id":"B-36","group":"B","name":"UDP asymmetric_mixed_moderate","node":"tests/test_degradation/test_throughput_degradation.py::TestUdpDegradation::test_udp_under_degradation[asymmetric_mixed_moderate-10.0-200.0]"},
-    {"id":"B-37","group":"B","name":"Steering：5G 劣化 → WiFi","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[5g_degraded_moderate-5G degraded, WiFi healthy \u2014 expect steering to WiFi]"},
-    {"id":"B-38","group":"B","name":"Steering：WiFi 劣化 → 5G","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[wifi_degraded_moderate-WiFi degraded, 5G healthy \u2014 expect steering to 5G]"},
-    {"id":"B-39","group":"B","name":"Steering：5G 高延遲 → WiFi","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[5g_high_latency_moderate-5G high latency, WiFi normal \u2014 expect latency-aware steering]"},
-    {"id":"B-40","group":"B","name":"Steering：WiFi 高延遲 → 5G","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[wifi_high_latency_moderate-WiFi high latency, 5G normal \u2014 expect latency-aware steering]"},
+    {"id":"B-37","group":"B","name":"Steering：5G 劣化 → WiFi","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[5g_degraded_moderate-5G degraded, WiFi healthy \\u2014 expect steering to WiFi]"},
+    {"id":"B-38","group":"B","name":"Steering：WiFi 劣化 → 5G","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[wifi_degraded_moderate-WiFi degraded, 5G healthy \\u2014 expect steering to 5G]"},
+    {"id":"B-39","group":"B","name":"Steering：5G 高延遲 → WiFi","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[5g_high_latency_moderate-5G high latency, WiFi normal \\u2014 expect latency-aware steering]"},
+    {"id":"B-40","group":"B","name":"Steering：WiFi 高延遲 → 5G","node":"tests/test_degradation/test_throughput_degradation.py::TestSteeringBehaviour::test_steering_maintains_throughput[wifi_high_latency_moderate-WiFi high latency, 5G normal \\u2014 expect latency-aware steering]"},
     {"id":"B-41","group":"B","name":"劣化後恢復：congested → clean","node":"tests/test_degradation/test_throughput_degradation.py::TestRecoveryAfterDegradation::test_tcp_recovery_after_congestion"},
     {"id":"B-42","group":"B","name":"Failover：5G 斷線 → WiFi","node":"tests/test_degradation/test_failover.py::TestLinkDisconnectFailover::test_failover_on_disconnect[5g_disconnect_visible-WiFi (LINE B)]"},
     {"id":"B-43","group":"B","name":"Failover：WiFi 斷線 → 5G","node":"tests/test_degradation/test_failover.py::TestLinkDisconnectFailover::test_failover_on_disconnect[wifi_disconnect_visible-5G (LINE A)]"},
@@ -195,7 +195,8 @@ async def run_pytest_task(run_id: str, nodes: list[str]):
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{PROJ_DIR/'src'}:{env.get('PYTHONPATH','')}"
     cmd = ["python3", "-m", "pytest", *nodes, "-v", "--timeout=900",
-           "--tb=short", f"--alluredir={RESULTS_DIR}", "--color=no"]
+           "--tb=short", f"--alluredir={RESULTS_DIR}", "--color=no",
+           "--continue-on-collection-errors"]
     run = runs[run_id]
     run["start"] = datetime.now().isoformat(timespec="seconds")
     try:
