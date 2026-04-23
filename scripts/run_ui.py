@@ -769,17 +769,7 @@ function updateSelCount() {
   btn.textContent = `▶ 執行選取測項 (${n})`; btn.disabled = n===0;
 }
 
-async function startRun() {
-  if (selected.size===0) return;
-  const ids = [...selected];
-  document.getElementById('terminal').innerHTML='';
-  initResultTable(ids);
-  setRunning(true);
-  const res = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({test_ids:ids})});
-  if (!res.ok) { const err=await res.json(); appendLine(`[ERROR] ${err.detail}`,'fail'); setRunning(false); return; }
-  const {run_id,count} = await res.json();
-  currentRunId=run_id; lastRunId=run_id;
-  appendLine(`▶ 開始執行 ${count} 個測項 (run: ${run_id})`,'info');
+function attachSse(run_id) {
   const sse = new EventSource(`/api/stream/${run_id}`);
   sse.onmessage = e => {
     const data = JSON.parse(e.data);
@@ -795,7 +785,45 @@ async function startRun() {
       if (m) { const t=TESTS.find(t=>t.node.includes(m[1])); if(t) updateResultIcon(t.id, m[2]); }
     }
   };
-  sse.onerror = () => { sse.close(); setRunning(false); };
+  sse.onerror = () => { sse.close(); setRunning(false); appendLine('[連線中斷] 測試仍可能在執行中，可按「🔄刷新」查看結果','warn'); };
+  return sse;
+}
+
+async function startRun() {
+  if (selected.size===0) return;
+  const ids = [...selected];
+  document.getElementById('terminal').innerHTML='';
+  initResultTable(ids);
+  setRunning(true);
+  let res;
+  try {
+    res = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({test_ids:ids})});
+  } catch(e) { appendLine(`[ERROR] 無法連線到伺服器: ${e}`,'fail'); setRunning(false); return; }
+
+  // 409: another run in progress — auto-stop it and retry once
+  if (res.status === 409) {
+    try {
+      const cur = await (await fetch('/api/current')).json();
+      if (cur.run_id) {
+        appendLine(`[警告] 偵測到殘留執行 (${cur.run_id})，自動終止後重試...`, 'warn');
+        await fetch(`/api/stop/${cur.run_id}`, {method:'POST'});
+        await new Promise(r => setTimeout(r, 800));
+        res = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({test_ids:ids})});
+      }
+    } catch(e) { /* ignore */ }
+  }
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const err = await res.json(); detail = err.detail || detail; } catch {}
+    appendLine(`[ERROR] ${detail}`, 'fail');
+    setRunning(false);
+    return;
+  }
+  const {run_id, count} = await res.json();
+  currentRunId=run_id; lastRunId=run_id;
+  appendLine(`▶ 開始執行 ${count} 個測項 (run: ${run_id})`,'info');
+  attachSse(run_id);
 }
 
 function onRunDone(data) {
@@ -1161,6 +1189,19 @@ function setEditorMsg(msg) { document.getElementById('editor-msg').textContent=m
 
 // ── Init ──
 buildTestList();
+// Sync UI state with server on page load
+(async () => {
+  try {
+    const cur = await (await fetch('/api/current')).json();
+    if (cur.run_id) {
+      currentRunId = cur.run_id; lastRunId = cur.run_id;
+      setRunning(true);
+      appendLine(`[恢復] 偵測到執行中的測試 (${cur.run_id})，重新連接輸出串流...`, 'info');
+      attachSse(cur.run_id);
+      switchTab('terminal');
+    }
+  } catch {}
+})();
 </script>
 </body>
 </html>"""
