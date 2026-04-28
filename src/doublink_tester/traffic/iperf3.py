@@ -8,7 +8,7 @@ import logging
 import time
 from typing import Any
 
-from doublink_tester.models import TrafficResult
+from doublink_tester.models import TrafficResult, TrafficTimepoint
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,25 @@ class Iperf3Generator:
     def is_running(self) -> bool:
         return self._process is not None and self._process.returncode is None
 
+    def _parse_timeseries(self, intervals: list[dict], protocol: str) -> list[TrafficTimepoint]:
+        """Parse iperf3 per-second interval data into TrafficTimepoint list.
+
+        Skips 'omitted' warm-up intervals that iperf3 marks as not counted.
+        """
+        points: list[TrafficTimepoint] = []
+        for interval in intervals:
+            s = interval.get("sum", {})
+            if s.get("omitted", False):
+                continue
+            points.append(TrafficTimepoint(
+                t_start=s.get("start", 0.0),
+                t_end=s.get("end", 0.0),
+                throughput_mbps=s.get("bits_per_second", 0) / 1_000_000,
+                loss_pct=s.get("lost_percent", 0.0),
+                jitter_ms=s.get("jitter_ms", 0.0),
+            ))
+        return points
+
     def _parse_json_output(self, raw: str, ended_at: float) -> TrafficResult:
         try:
             data = json.loads(raw)
@@ -121,7 +140,9 @@ class Iperf3Generator:
             )
 
         end = data.get("end", {})
+        intervals = data.get("intervals", [])
         protocol = "udp" if "sum" in end and "jitter_ms" in end.get("sum", {}) else "tcp"
+        timeseries = self._parse_timeseries(intervals, protocol)
 
         if protocol == "udp":
             summary = end.get("sum", {})
@@ -134,10 +155,10 @@ class Iperf3Generator:
                 raw_output=raw,
                 started_at=self._started_at,
                 ended_at=ended_at,
+                timeseries=timeseries,
             )
 
         # TCP
-        sent = end.get("sum_sent", {})
         received = end.get("sum_received", {})
         return TrafficResult(
             generator="iperf3",
@@ -146,4 +167,5 @@ class Iperf3Generator:
             raw_output=raw,
             started_at=self._started_at,
             ended_at=ended_at,
+            timeseries=timeseries,
         )

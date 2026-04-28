@@ -201,6 +201,17 @@ class TrafficProfile:
 
 
 @dataclass
+class TrafficTimepoint:
+    """Per-interval measurement extracted from iperf3 -J interval data."""
+
+    t_start: float          # seconds from test start (iperf3 interval "start")
+    t_end: float            # seconds from test start (iperf3 interval "end")
+    throughput_mbps: float
+    loss_pct: float = 0.0   # UDP only
+    jitter_ms: float = 0.0  # UDP only
+
+
+@dataclass
 class TrafficResult:
     """Normalized result from any traffic generator."""
 
@@ -217,3 +228,4 @@ class TrafficResult:
     raw_output: str = ""
     started_at: float = 0.0
     ended_at: float = 0.0
+    timeseries: list[TrafficTimepoint] = field(default_factory=list)
