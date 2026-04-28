@@ -14,6 +14,9 @@ import pytest_asyncio
 
 logger = logging.getLogger(__name__)
 
+# Rule statuses that are already inactive — no need to clear them again
+_INACTIVE_STATUSES = {"cleared", "deleted", "error"}
+
 
 def _interfaces_dict(settings) -> dict[str, str]:
     """Build the interfaces mapping expected by NetworkConditionProfile.get_rule_params()."""
@@ -26,12 +29,66 @@ def _interfaces_dict(settings) -> dict[str, str]:
     }
 
 
+async def _clear_all_active_rules(netemu_client) -> int:
+    """Clear every active rule on NetEmu. Returns the number of rules cleared.
+
+    This is called both by clean_network (autouse guard) and by _apply() before
+    installing a new profile — so dirty state left by manual clear_rule() calls
+    inside individual tests never leaks to the next test.
+    """
+    try:
+        rules = await netemu_client.list_rules()
+    except Exception as e:
+        logger.warning("clear_all_active_rules: failed to list rules: %s", e)
+        return 0
+
+    cleared = 0
+    for rule in rules:
+        status = rule.get("status", "")
+        if status in _INACTIVE_STATUSES:
+            continue
+        try:
+            await netemu_client.clear_rule(rule["id"])
+            cleared += 1
+            logger.debug("Cleared rule %s (was %s)", rule["id"], status)
+        except Exception as e:
+            logger.warning("Failed to clear rule %s (status=%s): %s", rule["id"], status, e)
+
+    return cleared
+
+
+@pytest_asyncio.fixture(loop_scope="session", autouse=True)
+async def clean_network(netemu_client):
+    """Autouse guard: ensure a clean network state before and after every test.
+
+    Runs for ALL tests in the session. Clears all active NetEmu rules before the
+    test begins, so leftover conditions from a previous test (or a failed teardown)
+    cannot affect this test's baseline.
+
+    The post-test teardown clears rules again as belt-and-suspenders, complementing
+    apply_network_condition's own teardown.
+    """
+    n = await _clear_all_active_rules(netemu_client)
+    if n:
+        logger.info("clean_network [setup]: cleared %d leftover rule(s) before test", n)
+
+    yield
+
+    n = await _clear_all_active_rules(netemu_client)
+    if n:
+        logger.info("clean_network [teardown]: cleared %d rule(s) after test", n)
+
+
 @pytest_asyncio.fixture(loop_scope="session")
 async def apply_network_condition(netemu_client, network_profiles, settings):
     """Factory fixture: apply a dual-line network condition profile and auto-clear on teardown.
 
     Creates egress rules on all affected interfaces (up to 4: A-DL, A-UL, B-DL, B-UL).
     Returns a list of created rule_ids so tests can inspect individual rules.
+
+    Before installing a new profile this fixture clears ALL active NetEmu rules —
+    not just the ones it tracked — to handle the case where a test manually called
+    netemu_client.clear_rule() (which would desync the internal tracking list).
 
     Usage::
 
@@ -49,12 +106,14 @@ async def apply_network_condition(netemu_client, network_profiles, settings):
                 f"Available: {list(network_profiles.keys())}"
             )
 
-        # Clear any previously-created rules before applying new profile
-        for old_id in list(created_rule_ids):
-            try:
-                await netemu_client.clear_rule(old_id)
-            except Exception:
-                pass
+        # Clear ALL active rules — not just the ones we tracked.
+        # This handles the desync that occurs when a test calls
+        # netemu_client.clear_rule() directly (those IDs stay in
+        # created_rule_ids but are already gone from NetEmu, so a
+        # targeted clear would silently fail and leave stale state).
+        n = await _clear_all_active_rules(netemu_client)
+        if n:
+            logger.debug("apply(%s): cleared %d pre-existing rule(s)", profile_id, n)
         created_rule_ids.clear()
 
         profile = network_profiles[profile_id]
@@ -63,6 +122,7 @@ async def apply_network_condition(netemu_client, network_profiles, settings):
 
         if not rule_params_list:
             # Clean profile — no rules to create
+            logger.debug("apply(%s): clean profile, no rules created", profile_id)
             return []
 
         ids: list[str] = []
@@ -79,26 +139,10 @@ async def apply_network_condition(netemu_client, network_profiles, settings):
 
     yield _apply
 
-    # Teardown: clear all rules created during this test
+    # Teardown: clear rules created during this test.
+    # clean_network's autouse teardown will also run as a safety net.
     for rule_id in created_rule_ids:
         try:
             await netemu_client.clear_rule(rule_id)
-        except Exception:
-            logger.debug("Best-effort cleanup failed for rule %s", rule_id)
-
-
-@pytest_asyncio.fixture(loop_scope="session")
-async def clean_network(netemu_client):
-    """Ensure a clean network state before and after test — clears all active rules."""
-
-    async def _clear_all():
-        rules = await netemu_client.list_rules()
-        for rule in rules:
-            try:
-                await netemu_client.clear_rule(rule["id"])
-            except Exception:
-                pass
-
-    await _clear_all()
-    yield
-    await _clear_all()
+        except Exception as e:
+            logger.warning("Teardown: failed to clear rule %s: %s", rule_id, e)
