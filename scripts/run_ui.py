@@ -180,6 +180,11 @@ runs: dict[str, dict] = {}
 current_run_id: str | None = None
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
+# ── Allure report server state ────────────────────────────────────
+ALLURE_PORT = 8099
+ALLURE_HTML_DIR = PROJ_DIR / "allure-html"
+_allure_server_proc: subprocess.Popen | None = None
+
 def strip_ansi(s: str) -> str:
     return ANSI_RE.sub("", s)
 
@@ -317,6 +322,65 @@ async def generate_report(run_id: str):
 async def get_allure_results():
     """Return current allure-results parsed metrics for all tests."""
     return parse_allure_for_ui()
+
+
+@app.post("/api/allure/serve")
+async def start_allure_serve():
+    """Generate a static Allure HTML report and serve it on ALLURE_PORT.
+
+    Re-generates each time it is called so the report reflects the latest results.
+    """
+    global _allure_server_proc
+
+    if not RESULTS_DIR.exists() or not any(RESULTS_DIR.iterdir()):
+        raise HTTPException(400, "尚無測試結果，請先執行測試")
+
+    # Kill existing HTTP server if running
+    if _allure_server_proc and _allure_server_proc.poll() is None:
+        _allure_server_proc.terminate()
+        try:
+            _allure_server_proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            _allure_server_proc.kill()
+        _allure_server_proc = None
+
+    # Kill any stale process still holding the port
+    subprocess.run(["fuser", "-k", f"{ALLURE_PORT}/tcp"],
+                   capture_output=True, check=False)
+
+    # Generate static Allure HTML report
+    gen_proc = await asyncio.create_subprocess_exec(
+        "allure", "generate", str(RESULTS_DIR),
+        "-o", str(ALLURE_HTML_DIR), "--clean",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=str(PROJ_DIR),
+    )
+    try:
+        _, stderr = await asyncio.wait_for(gen_proc.communicate(), timeout=120)
+    except asyncio.TimeoutError:
+        gen_proc.kill()
+        raise HTTPException(500, "allure generate timed out")
+    if gen_proc.returncode != 0:
+        detail = stderr.decode(errors="replace")[:300] if stderr else "unknown error"
+        raise HTTPException(500, f"allure generate failed: {detail}")
+
+    # Serve the generated HTML with Python's built-in HTTP server
+    _allure_server_proc = subprocess.Popen(
+        ["python3", "-m", "http.server", str(ALLURE_PORT), "--bind", "0.0.0.0"],
+        cwd=str(ALLURE_HTML_DIR),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    url = f"http://192.168.105.210:{ALLURE_PORT}"
+    return {"ok": True, "url": url}
+
+
+@app.get("/api/allure/status")
+async def allure_serve_status():
+    running = _allure_server_proc is not None and _allure_server_proc.poll() is None
+    return {"running": running, "url": f"http://192.168.105.210:{ALLURE_PORT}" if running else None}
 
 
 # ── Profile routes ────────────────────────────────────────────────
@@ -661,9 +725,10 @@ header h1{font-size:16px;font-weight:700;color:var(--accent)}
         </table>
       </div>
       <div class="report-bar">
-        <span class="msg" id="report-msg">執行完成後可生成 Word 報告</span>
+        <span class="msg" id="report-msg">執行完成後可生成報告</span>
         <button class="btn-sm" onclick="refreshMetrics()">🔄 刷新數值</button>
-        <button class="btn-sm" id="btn-report" onclick="generateReport()" disabled>📄 生成 Word 報告</button>
+        <button class="btn-sm" id="btn-allure" onclick="openAllureReport()">📈 Allure 報告</button>
+        <button class="btn-sm" id="btn-report" onclick="generateReport()" disabled>📄 Word 報告</button>
         <a id="report-link" href="#" style="display:none" class="btn-sm" target="_blank">⬇ 下載</a>
       </div>
     </div>
@@ -965,7 +1030,7 @@ function updateResultIcon(tid, status) {
 async function generateReport() {
   if(!lastRunId) return;
   document.getElementById('btn-report').disabled=true;
-  document.getElementById('report-msg').textContent='⏳ 生成報告中...';
+  document.getElementById('report-msg').textContent='⏳ 生成 Word 報告中...';
   const res=await fetch(`/api/report/${lastRunId}`,{method:'POST'});
   if(res.ok){
     const data=await res.json();
@@ -974,6 +1039,29 @@ async function generateReport() {
     link.href=data.download; link.textContent=`⬇ 下載 ${data.file}`; link.style.display='inline-block';
   } else { document.getElementById('report-msg').textContent='❌ 報告生成失敗'; }
   document.getElementById('btn-report').disabled=false;
+}
+
+async function openAllureReport() {
+  const btn = document.getElementById('btn-allure');
+  const msg = document.getElementById('report-msg');
+  btn.disabled = true;
+  btn.textContent = '⏳ 產生中...';
+  try {
+    const res = await fetch('/api/allure/serve', {method:'POST'});
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    msg.textContent = `✅ Allure 報告已啟動 → ${data.url}`;
+    btn.textContent = '📈 Allure 報告';
+    btn.disabled = false;
+    window.open(data.url, '_blank');
+  } catch(e) {
+    msg.textContent = `❌ Allure 報告失敗：${e.message}`;
+    btn.textContent = '📈 Allure 報告';
+    btn.disabled = false;
+  }
 }
 
 function appendLine(text, cls) {
