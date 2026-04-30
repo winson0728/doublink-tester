@@ -181,9 +181,10 @@ current_run_id: str | None = None
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 # ── Allure report server state ────────────────────────────────────
-ALLURE_PORT    = 8099
-ALLURE_HTML_DIR = PROJ_DIR / "allure-html"
-ARCHIVES_DIR   = PROJ_DIR / "allure-archives"   # one sub-dir per test run
+ALLURE_PORT      = 8099
+ALLURE_HTML_DIR  = PROJ_DIR / "allure-html"
+ARCHIVES_DIR     = PROJ_DIR / "allure-archives"   # one sub-dir per test run
+ALLURE_HIST_DIR  = PROJ_DIR / "allure-history"    # persistent history for TREND
 _allure_server_proc: subprocess.Popen | None = None
 
 def strip_ansi(s: str) -> str:
@@ -407,24 +408,50 @@ async def start_allure_serve(req: AllureServeRequest | None = None):
     subprocess.run(["fuser", "-k", f"{ALLURE_PORT}/tcp"],
                    capture_output=True, check=False)
 
-    # Generate static Allure HTML report from the chosen source directory
-    gen_proc = await asyncio.create_subprocess_exec(
-        "allure", "generate", str(src_dir),
-        "-o", str(ALLURE_HTML_DIR), "--clean",
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=str(PROJ_DIR),
-    )
-    try:
-        _, stderr = await asyncio.wait_for(gen_proc.communicate(), timeout=120)
-    except asyncio.TimeoutError:
-        gen_proc.kill()
-        raise HTTPException(500, "allure generate timed out")
-    if gen_proc.returncode != 0:
-        detail = stderr.decode(errors="replace")[:300] if stderr else "unknown error"
-        raise HTTPException(500, f"allure generate failed: {detail}")
+    # ── History injection (current results only, not archives) ───────
+    # Inject persistent history so the TREND graph accumulates across runs.
+    # We temporarily place allure-history/ inside the results dir, then
+    # remove it after generation so the source is never permanently modified.
+    import shutil
+    hist_dest = src_dir / "history"
+    history_injected = False
+    if not archive_name and ALLURE_HIST_DIR.exists() and not hist_dest.exists():
+        shutil.copytree(str(ALLURE_HIST_DIR), str(hist_dest))
+        history_injected = True
 
-    # Serve the generated HTML with Python's built-in HTTP server
+    # ── Generate static Allure HTML report ────────────────────────────
+    try:
+        gen_proc = await asyncio.create_subprocess_exec(
+            "allure", "generate", str(src_dir),
+            "-o", str(ALLURE_HTML_DIR), "--clean",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(PROJ_DIR),
+        )
+        try:
+            _, stderr = await asyncio.wait_for(gen_proc.communicate(), timeout=120)
+        except asyncio.TimeoutError:
+            gen_proc.kill()
+            raise HTTPException(500, "allure generate timed out")
+        if gen_proc.returncode != 0:
+            detail = stderr.decode(errors="replace")[:300] if stderr else "unknown error"
+            raise HTTPException(500, f"allure generate failed: {detail}")
+    finally:
+        # Always clean up injected history from the source directory
+        if history_injected and hist_dest.exists():
+            shutil.rmtree(str(hist_dest), ignore_errors=True)
+
+    # ── Persist updated history for future TREND accumulation ─────────
+    # Only update history when generating from current results (not archives),
+    # so the history reflects real chronological order.
+    if not archive_name:
+        new_hist = ALLURE_HTML_DIR / "history"
+        if new_hist.exists():
+            if ALLURE_HIST_DIR.exists():
+                shutil.rmtree(str(ALLURE_HIST_DIR))
+            shutil.copytree(str(new_hist), str(ALLURE_HIST_DIR))
+
+    # ── Serve the generated HTML ───────────────────────────────────────
     _allure_server_proc = subprocess.Popen(
         ["python3", "-m", "http.server", str(ALLURE_PORT), "--bind", "0.0.0.0"],
         cwd=str(ALLURE_HTML_DIR),
