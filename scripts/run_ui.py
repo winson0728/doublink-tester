@@ -181,8 +181,9 @@ current_run_id: str | None = None
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 # ── Allure report server state ────────────────────────────────────
-ALLURE_PORT = 8099
+ALLURE_PORT    = 8099
 ALLURE_HTML_DIR = PROJ_DIR / "allure-html"
+ARCHIVES_DIR   = PROJ_DIR / "allure-archives"   # one sub-dir per test run
 _allure_server_proc: subprocess.Popen | None = None
 
 def strip_ansi(s: str) -> str:
@@ -236,6 +237,9 @@ async def run_pytest_task(run_id: str, nodes: list[str]):
         run["status"] = "done"
         run["end"] = datetime.now().isoformat(timespec="seconds")
         current_run_id = None
+
+        # Archive results so historical reports can be viewed later
+        _archive_results(run_id)
 
 
 # ── Test runner routes ────────────────────────────────────────────
@@ -318,22 +322,77 @@ async def generate_report(run_id: str):
             "download": f"http://192.168.105.210:8888/{out.name}"}
 
 
+def _archive_results(run_id: str) -> Path | None:
+    """Copy current allure-results into allure-archives/<timestamp>_<run_id>/."""
+    import shutil
+    if not RESULTS_DIR.exists() or not any(RESULTS_DIR.iterdir()):
+        return None
+    ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    dest = ARCHIVES_DIR / f"{ts}_{run_id}"
+    try:
+        ARCHIVES_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(str(RESULTS_DIR), str(dest))
+        return dest
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to archive results: %s", e)
+        return None
+
+
 @app.get("/api/results")
 async def get_allure_results():
     """Return current allure-results parsed metrics for all tests."""
     return parse_allure_for_ui()
 
 
+class AllureServeRequest(BaseModel):
+    archive: str | None = None   # None → use current allure-results/
+
+
+@app.get("/api/allure/archives")
+async def list_allure_archives():
+    """Return list of archived test runs, newest first.
+
+    Each entry: {"name": "2026-04-30_143022_abc12345", "label": "2026/04/30 14:30:22"}
+    """
+    if not ARCHIVES_DIR.exists():
+        return []
+    entries = []
+    for d in sorted(ARCHIVES_DIR.iterdir(), reverse=True):
+        if not d.is_dir():
+            continue
+        name = d.name                       # e.g. 2026-04-30_143022_abc12345
+        parts = name.split("_")
+        try:
+            date_str = parts[0]             # 2026-04-30
+            time_str = parts[1]             # 143022
+            h, m, s = time_str[:2], time_str[2:4], time_str[4:6]
+            label = f"{date_str.replace('-','/')} {h}:{m}:{s}"
+        except (IndexError, ValueError):
+            label = name
+        entries.append({"name": name, "label": label})
+    return entries
+
+
 @app.post("/api/allure/serve")
-async def start_allure_serve():
+async def start_allure_serve(req: AllureServeRequest | None = None):
     """Generate a static Allure HTML report and serve it on ALLURE_PORT.
 
-    Re-generates each time it is called so the report reflects the latest results.
+    Pass ``{"archive": "2026-04-30_143022_abc12345"}`` to serve a historical run,
+    or omit / pass null to serve the current allure-results/.
     """
     global _allure_server_proc
 
-    if not RESULTS_DIR.exists() or not any(RESULTS_DIR.iterdir()):
-        raise HTTPException(400, "尚無測試結果，請先執行測試")
+    archive_name = (req.archive if req else None) or ""
+
+    if archive_name:
+        src_dir = ARCHIVES_DIR / archive_name
+        if not src_dir.exists():
+            raise HTTPException(404, f"存檔不存在：{archive_name}")
+    else:
+        src_dir = RESULTS_DIR
+        if not src_dir.exists() or not any(src_dir.iterdir()):
+            raise HTTPException(400, "尚無測試結果，請先執行測試")
 
     # Kill existing HTTP server if running
     if _allure_server_proc and _allure_server_proc.poll() is None:
@@ -348,9 +407,9 @@ async def start_allure_serve():
     subprocess.run(["fuser", "-k", f"{ALLURE_PORT}/tcp"],
                    capture_output=True, check=False)
 
-    # Generate static Allure HTML report
+    # Generate static Allure HTML report from the chosen source directory
     gen_proc = await asyncio.create_subprocess_exec(
-        "allure", "generate", str(RESULTS_DIR),
+        "allure", "generate", str(src_dir),
         "-o", str(ALLURE_HTML_DIR), "--clean",
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.PIPE,
@@ -374,7 +433,8 @@ async def start_allure_serve():
     )
 
     url = f"http://192.168.105.210:{ALLURE_PORT}"
-    return {"ok": True, "url": url}
+    label = archive_name if archive_name else "最新結果"
+    return {"ok": True, "url": url, "label": label}
 
 
 @app.get("/api/allure/status")
@@ -727,6 +787,9 @@ header h1{font-size:16px;font-weight:700;color:var(--accent)}
       <div class="report-bar">
         <span class="msg" id="report-msg">執行完成後可生成報告</span>
         <button class="btn-sm" onclick="refreshMetrics()">🔄 刷新數值</button>
+        <select id="sel-archive" class="btn-sm" style="max-width:180px;cursor:pointer" title="選擇歷史報告">
+          <option value="">最新結果</option>
+        </select>
         <button class="btn-sm" id="btn-allure" onclick="openAllureReport()">📈 Allure 報告</button>
         <button class="btn-sm" id="btn-report" onclick="generateReport()" disabled>📄 Word 報告</button>
         <a id="report-link" href="#" style="display:none" class="btn-sm" target="_blank">⬇ 下載</a>
@@ -907,6 +970,7 @@ function onRunDone(data) {
   }
   appendLine('',''); appendLine(`═══ 完成：${data.passed} PASSED  ${data.failed} FAILED ═══`, data.failed>0?'fail':'pass');
   switchTab('results');
+  loadAllureArchives();   // refresh archive dropdown after each run
 }
 
 async function stopRun() {
@@ -1041,19 +1105,45 @@ async function generateReport() {
   document.getElementById('btn-report').disabled=false;
 }
 
+async function loadAllureArchives() {
+  const sel = document.getElementById('sel-archive');
+  const prev = sel.value;
+  try {
+    const res = await fetch('/api/allure/archives');
+    if (!res.ok) return;
+    const archives = await res.json();
+    // Rebuild options: keep "最新結果" first
+    sel.innerHTML = '<option value="">最新結果</option>';
+    archives.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.name;
+      opt.textContent = a.label;
+      sel.appendChild(opt);
+    });
+    // Restore previous selection if still available
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  } catch(e) { /* ignore */ }
+}
+
 async function openAllureReport() {
   const btn = document.getElementById('btn-allure');
   const msg = document.getElementById('report-msg');
+  const archive = document.getElementById('sel-archive').value;
   btn.disabled = true;
   btn.textContent = '⏳ 產生中...';
   try {
-    const res = await fetch('/api/allure/serve', {method:'POST'});
+    const body = archive ? JSON.stringify({archive}) : '{}';
+    const res = await fetch('/api/allure/serve', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body,
+    });
     if (!res.ok) {
       const err = await res.json().catch(()=>({}));
       throw new Error(err.detail || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    msg.textContent = `✅ Allure 報告已啟動 → ${data.url}`;
+    msg.textContent = `✅ Allure 報告（${data.label}）已啟動 → ${data.url}`;
     btn.textContent = '📈 Allure 報告';
     btn.disabled = false;
     window.open(data.url, '_blank');
@@ -1278,6 +1368,7 @@ function setEditorMsg(msg) { document.getElementById('editor-msg').textContent=m
 
 // ── Init ──
 buildTestList();
+loadAllureArchives();    // populate archive dropdown on page load
 // Sync UI state with server on page load
 (async () => {
   try {
