@@ -198,6 +198,10 @@ app = FastAPI(title="Doublink Test Runner")
 # ── pytest task ───────────────────────────────────────────────────
 async def run_pytest_task(run_id: str, nodes: list[str]):
     global current_run_id
+    # Clear previous results so each run is isolated (required for Allure TREND)
+    import shutil
+    if RESULTS_DIR.exists():
+        shutil.rmtree(str(RESULTS_DIR))
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{PROJ_DIR/'src'}:{env.get('PYTHONPATH','')}"
@@ -306,21 +310,38 @@ async def current_run_info():
 @app.post("/api/report/{run_id}")
 async def generate_report(run_id: str):
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    out = REPORTS_DIR / f"doublink_test_report_{today}.docx"
+    ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    out = REPORTS_DIR / f"doublink_test_report_{ts}.docx"
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{PROJ_DIR/'src'}:{env.get('PYTHONPATH','')}"
     r = subprocess.run(["python3", str(REPORT_SCRIPT), str(RESULTS_DIR), str(out)],
                        capture_output=True, text=True, env=env, cwd=str(PROJ_DIR))
     if r.returncode != 0:
         raise HTTPException(500, r.stderr[:500])
-    allure_rep = PROJ_DIR / "allure-report"
-    if allure_rep.exists():
-        import shutil
-        shutil.copy(out, allure_rep / out.name)
-        shutil.copy(out, allure_rep / "doublink_test_report_latest.docx")
     return {"ok": True, "file": out.name,
-            "download": f"http://192.168.105.210:8888/{out.name}"}
+            "download": f"/api/reports/download/{out.name}"}
+
+
+@app.get("/api/reports")
+async def list_reports():
+    """List all generated Word reports, newest first."""
+    if not REPORTS_DIR.exists():
+        return []
+    files = sorted(REPORTS_DIR.glob("*.docx"), key=lambda f: f.stat().st_mtime, reverse=True)
+    return [{"name": f.name, "size_kb": round(f.stat().st_size / 1024)} for f in files]
+
+
+@app.get("/api/reports/download/{filename}")
+async def download_report(filename: str):
+    from fastapi.responses import FileResponse
+    # Safety: only serve files inside REPORTS_DIR, no path traversal
+    filepath = (REPORTS_DIR / filename).resolve()
+    if not str(filepath).startswith(str(REPORTS_DIR.resolve())) or not filepath.exists():
+        raise HTTPException(404, "Report not found")
+    return FileResponse(
+        str(filepath), filename=filename,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
 
 
 def _archive_results(run_id: str) -> Path | None:
@@ -814,12 +835,16 @@ header h1{font-size:16px;font-weight:700;color:var(--accent)}
       <div class="report-bar">
         <span class="msg" id="report-msg">執行完成後可生成報告</span>
         <button class="btn-sm" onclick="refreshMetrics()">🔄 刷新數值</button>
-        <select id="sel-archive" class="btn-sm" style="max-width:180px;cursor:pointer" title="選擇歷史報告">
+        <select id="sel-archive" class="btn-sm" style="max-width:180px;cursor:pointer" title="選擇 Allure 歷史">
           <option value="">最新結果</option>
         </select>
         <button class="btn-sm" id="btn-allure" onclick="openAllureReport()">📈 Allure 報告</button>
         <button class="btn-sm" id="btn-report" onclick="generateReport()" disabled>📄 Word 報告</button>
-        <a id="report-link" href="#" style="display:none" class="btn-sm" target="_blank">⬇ 下載</a>
+        <select id="sel-report" class="btn-sm" style="max-width:190px;cursor:pointer" title="歷史 Word 報告">
+          <option value="">— 歷史 Word 報告 —</option>
+        </select>
+        <a id="report-dl-hist" href="#" style="display:none" class="btn-sm" target="_blank">⬇ 下載</a>
+        <a id="report-link" href="#" style="display:none" class="btn-sm" target="_blank">⬇ 最新報告</a>
       </div>
     </div>
 
@@ -998,6 +1023,7 @@ function onRunDone(data) {
   appendLine('',''); appendLine(`═══ 完成：${data.passed} PASSED  ${data.failed} FAILED ═══`, data.failed>0?'fail':'pass');
   switchTab('results');
   loadAllureArchives();   // refresh archive dropdown after each run
+  loadReportList();       // refresh Word report list
 }
 
 async function stopRun() {
@@ -1127,10 +1153,42 @@ async function generateReport() {
     const data=await res.json();
     document.getElementById('report-msg').textContent=`✅ 報告已生成：${data.file}`;
     const link=document.getElementById('report-link');
-    link.href=data.download; link.textContent=`⬇ 下載 ${data.file}`; link.style.display='inline-block';
+    link.href=data.download; link.textContent=`⬇ 最新報告`; link.style.display='inline-block';
+    await loadReportList();
   } else { document.getElementById('report-msg').textContent='❌ 報告生成失敗'; }
   document.getElementById('btn-report').disabled=false;
 }
+
+async function loadReportList() {
+  const sel = document.getElementById('sel-report');
+  try {
+    const res = await fetch('/api/reports');
+    if (!res.ok) return;
+    const reports = await res.json();
+    sel.innerHTML = '<option value="">— 歷史 Word 報告 —</option>';
+    reports.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.name;
+      // format: doublink_test_report_2026-04-30_143022.docx → 2026/04/30 14:30:22
+      const m = r.name.match(/(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})/);
+      opt.textContent = m
+        ? `${m[1].replace(/-/g,'/')} ${m[2]}:${m[3]}:${m[4]}  (${r.size_kb}KB)`
+        : r.name;
+      sel.appendChild(opt);
+    });
+  } catch(e) { /* ignore */ }
+}
+
+document.getElementById('sel-report').addEventListener('change', function() {
+  const dl = document.getElementById('report-dl-hist');
+  if (this.value) {
+    dl.href = `/api/reports/download/${encodeURIComponent(this.value)}`;
+    dl.textContent = '⬇ 下載';
+    dl.style.display = 'inline-block';
+  } else {
+    dl.style.display = 'none';
+  }
+});
 
 async function loadAllureArchives() {
   const sel = document.getElementById('sel-archive');
@@ -1396,6 +1454,7 @@ function setEditorMsg(msg) { document.getElementById('editor-msg').textContent=m
 // ── Init ──
 buildTestList();
 loadAllureArchives();    // populate archive dropdown on page load
+loadReportList();        // populate Word report history on page load
 // Sync UI state with server on page load
 (async () => {
   try {
