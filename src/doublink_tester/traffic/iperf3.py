@@ -79,21 +79,41 @@ class Iperf3Generator:
         target: str,
         duration_s: int,
         retries: int = 3,
-        retry_delay_s: float = 5.0,
+        retry_delay_s: float = 8.0,
         **kwargs: Any,
     ) -> TrafficResult:
-        """Run iperf3 with retry logic for transient errors (server busy, connection reset)."""
+        """Run iperf3 with retry logic for transient errors.
+
+        Retries on: server busy, connection refused, connection reset, no route to host,
+        or any JSON-parse failure (protocol == "unknown") — all of which indicate the
+        server was temporarily unavailable rather than a real measurement failure.
+        """
         last_result: TrafficResult | None = None
         for attempt in range(1, retries + 1):
             await self.start(target, duration_s, **kwargs)
             result = await self.wait()
 
-            # Check for transient iperf3 errors that warrant a retry
-            raw = result.raw_output or ""
-            is_server_busy = "server is busy" in raw or "server is busy" in str(result)
-            is_conn_reset = "Connection reset" in raw or "unable to send control message" in raw
-            is_transient = (result.throughput_mbps == 0 and result.protocol != "unknown"
-                           and (is_server_busy or is_conn_reset))
+            # Classify transient vs real errors when throughput is zero.
+            # "server is busy"       — iperf3 server occupied by another client
+            # "Connection refused"   — server process crashed / port not open yet
+            # "unable to connect"    — server unreachable (covers both refused & timeout)
+            # "Connection reset"     — session torn mid-flight by a mode switch
+            # "No route to host"     — routing gap during multilink state change
+            # protocol == "unknown"  — iperf3 produced non-JSON output (any crash/error)
+            if result.throughput_mbps == 0:
+                raw = result.raw_output or ""
+                is_transient = (
+                    "server is busy" in raw
+                    or "Connection refused" in raw
+                    or "unable to connect" in raw
+                    or "Connection reset" in raw
+                    or "unable to send control message" in raw
+                    or "No route to host" in raw
+                    or "Network is unreachable" in raw
+                    or result.protocol == "unknown"
+                )
+            else:
+                is_transient = False
 
             if not is_transient or attempt == retries:
                 return result

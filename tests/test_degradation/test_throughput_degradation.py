@@ -338,13 +338,22 @@ class TestSteeringBehaviour:
         self,
         profile_id: str,
         description: str,
+        set_multilink_mode,
         apply_network_condition,
         iperf3_runner,
     ):
-        """When one link is degraded, ATSSS should steer traffic to the healthy link."""
+        """When one link is degraded, ATSSS should steer traffic to the healthy link.
+
+        Requires real_time mode — ATSSS link selection (steering) only operates in
+        real_time mode.  Bonding / duplicate spread traffic regardless of link quality.
+        The mode is set explicitly here so this test is not affected by residual mode
+        state left over from previous mode-switching tests.
+        """
         allure.dynamic.title(f"Steering: {profile_id}")
         allure.dynamic.description(description)
 
+        # Steering only works in real_time mode (ATSSS link selection)
+        await set_multilink_mode("real_time")
         await apply_network_condition(profile_id)
 
         result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)

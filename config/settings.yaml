@@ -21,6 +21,7 @@ doublink:
 
   timeouts:
     traffic_start_s: 10
-    mode_switch_s: 15
+    mode_switch_s: 20          # seconds to wait for mode to stabilise after a switch
     network_settle_s: 5
     metric_sample_interval_s: 2.0
+    iperf3_settle_s: 3         # cooldown between consecutive iperf3 runs

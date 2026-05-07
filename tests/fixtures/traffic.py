@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import asyncio
+
 import allure
 import pytest_asyncio
 
@@ -79,6 +81,11 @@ async def iperf3_runner(settings):
     After each run a per-second throughput chart is automatically attached to the
     Allure report.  For multi-phase charts use ``attach_combined_chart()``.
 
+    A short post-run cooldown (``settings.timeouts.iperf3_settle_s``, default 3s) is
+    applied after every run so the iperf3 server can release its connection state before
+    the next test begins.  This prevents "server is busy" / "Connection refused" cascades
+    in long automated sessions.
+
     Usage::
 
         async def test_throughput(iperf3_runner):
@@ -118,6 +125,13 @@ async def iperf3_runner(settings):
         chart_name = f"traffic_{protocol}_{_run_counter[0]:02d}.png"
         chart_bytes = generate_single_chart(result, title=title, events=chart_events)
         _attach_chart(chart_bytes, chart_name)
+
+        # Post-run cooldown: give iperf3 server time to release its connection
+        # state before the next test connects.  Prevents cascading "server is busy"
+        # / "Connection refused" failures in back-to-back automated test sessions.
+        settle = getattr(settings.timeouts, "iperf3_settle_s", 3)
+        if settle > 0:
+            await asyncio.sleep(settle)
 
         return result
 

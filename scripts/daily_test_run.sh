@@ -69,6 +69,7 @@ $PYTHON -m pytest \
   --timeout=$PYTEST_TIMEOUT \
   --alluredir="$PROJ_DIR/allure-results" \
   --tb=short \
+  --continue-on-collection-errors \
   2>&1 | tee -a "$LOG_FILE" || PYTEST_EXIT=$?
 
 # 解析測試結果

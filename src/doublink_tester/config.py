@@ -31,9 +31,10 @@ def _resolve_env_vars(value: str) -> str:
 
 class TimeoutSettings(BaseModel):
     traffic_start_s: int = 10
-    mode_switch_s: int = 15
+    mode_switch_s: int = 20
     network_settle_s: int = 5
     metric_sample_interval_s: float = 2.0
+    iperf3_settle_s: int = 3   # cooldown between consecutive iperf3 runs
 
 
 class InterfaceSettings(BaseModel):
