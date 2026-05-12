@@ -1,10 +1,10 @@
-"""Time-series traffic chart generation for Allure test reports.
+"""Chart generation for Allure test reports.
 
-Produces PNG charts from iperf3 per-interval data.  Two entry points:
+Three entry points:
 
-* ``generate_single_chart(result, ...)``   — one iperf3 run
-* ``generate_combined_chart(results, ...)`` — multiple runs stitched end-to-end,
-  with vertical markers for mode-switch / network-change events
+* ``generate_single_chart(result, ...)``      — single iperf3 run throughput timeline
+* ``generate_combined_chart(results, ...)``   — multiple runs stitched end-to-end
+* ``generate_link_snapshot_chart(links, ...)``— link quality snapshot (latency/loss/weight)
 
 matplotlib is an optional dev dependency.  If it is not installed the functions
 return empty bytes and tests continue to run normally.
@@ -17,7 +17,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from doublink_tester.models import TrafficResult
+    from doublink_tester.models import LinkInfo, TrafficResult
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +245,125 @@ def generate_combined_chart(
 
     if title:
         fig.suptitle(title, fontsize=11, fontweight="bold")
+
+    fig.tight_layout()
+    return _png(fig)
+
+
+def generate_link_snapshot_chart(
+    links: "list[LinkInfo]",
+    title: str = "",
+) -> bytes:
+    """Generate a PNG bar chart summarising real-time multilink link quality.
+
+    Produces a 3-panel horizontal figure:
+      • Panel 1 — Latency (current / min–max range) per link
+      • Panel 2 — Packet loss (inbound + outbound) per link
+      • Panel 3 — ATSSS traffic weight per link
+
+    Each panel shows LINE_A (5G) in blue and LINE_B (WiFi) in green.
+
+    Args:
+        links: List of :class:`LinkInfo` objects (from ``MultilinkClient.get_links()``).
+               Typically 2 entries (LINE_A and LINE_B).
+        title: Optional chart title shown at the top.
+
+    Returns:
+        PNG image bytes, or ``b""`` if matplotlib unavailable or no link data.
+    """
+    if not _HAS_MPL or not links:
+        return b""
+
+    # ── Colour per link (matches LINE_A=blue, LINE_B=green convention) ─────────
+    link_colors = ["#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#E53935"]
+    names = [lnk.line_name for lnk in links]
+    colors = [link_colors[i % len(link_colors)] for i in range(len(links))]
+
+    x = list(range(len(links)))
+    bar_w = 0.5
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.5))
+
+    # ── Panel 1: Latency ───────────────────────────────────────────────────────
+    ax_lat = axes[0]
+    lats = [lnk.latency_ms for lnk in links]
+    errs_lo = [max(0.0, lnk.latency_ms - lnk.latency_min_ms) for lnk in links]
+    errs_hi = [max(0.0, lnk.latency_max_ms - lnk.latency_ms) for lnk in links]
+
+    bars = ax_lat.bar(x, lats, width=bar_w, color=colors, alpha=0.85, zorder=3)
+    ax_lat.errorbar(
+        x, lats,
+        yerr=[errs_lo, errs_hi],
+        fmt="none", color="#555", capsize=4, linewidth=1.2, zorder=4,
+    )
+    for bar, val in zip(bars, lats):
+        ax_lat.text(
+            bar.get_x() + bar.get_width() / 2, bar.get_height() + max(errs_hi) * 0.05,
+            f"{val:.1f}", ha="center", va="bottom", fontsize=8, fontweight="bold",
+        )
+    ax_lat.set_title("Latency (ms)", fontsize=9, fontweight="bold")
+    ax_lat.set_xticks(x)
+    ax_lat.set_xticklabels(names, fontsize=7.5, rotation=10, ha="right")
+    ax_lat.set_ylim(bottom=0)
+    ax_lat.grid(True, axis="y", alpha=0.25, linestyle="--")
+    ax_lat.set_ylabel("ms")
+
+    # ── Panel 2: Loss ─────────────────────────────────────────────────────────
+    ax_loss = axes[1]
+    loss_from = [lnk.loss_from_pct for lnk in links]
+    loss_to = [lnk.loss_to_pct for lnk in links]
+    x_from = [xi - bar_w / 4 for xi in x]
+    x_to   = [xi + bar_w / 4 for xi in x]
+
+    b_from = ax_loss.bar(x_from, loss_from, width=bar_w / 2, color=colors,
+                         alpha=0.6, label="Inbound", zorder=3)
+    b_to   = ax_loss.bar(x_to,   loss_to,   width=bar_w / 2, color=colors,
+                         alpha=0.9, label="Outbound", hatch="//", zorder=3)
+
+    for bars_grp in (b_from, b_to):
+        for bar in bars_grp:
+            h = bar.get_height()
+            if h > 0:
+                ax_loss.text(
+                    bar.get_x() + bar.get_width() / 2, h,
+                    f"{h:.1f}%", ha="center", va="bottom", fontsize=7,
+                )
+
+    ax_loss.set_title("Packet Loss (%)", fontsize=9, fontweight="bold")
+    ax_loss.set_xticks(x)
+    ax_loss.set_xticklabels(names, fontsize=7.5, rotation=10, ha="right")
+    ax_loss.set_ylim(bottom=0)
+    ax_loss.grid(True, axis="y", alpha=0.25, linestyle="--")
+    ax_loss.set_ylabel("%")
+    ax_loss.legend(fontsize=7, loc="upper right")
+
+    # ── Panel 3: Weight ───────────────────────────────────────────────────────
+    ax_wt = axes[2]
+    weights = [lnk.weight for lnk in links]
+    total_w = sum(weights) or 1
+    pct_w = [w / total_w * 100 for w in weights]
+
+    bars_w = ax_wt.bar(x, weights, width=bar_w, color=colors, alpha=0.85, zorder=3)
+    for bar, w, pct in zip(bars_w, weights, pct_w):
+        ax_wt.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + max(weights, default=1) * 0.02,
+            f"{w}\n({pct:.0f}%)",
+            ha="center", va="bottom", fontsize=8, fontweight="bold",
+        )
+    ax_wt.set_title("ATSSS Weight", fontsize=9, fontweight="bold")
+    ax_wt.set_xticks(x)
+    ax_wt.set_xticklabels(names, fontsize=7.5, rotation=10, ha="right")
+    ax_wt.set_ylim(bottom=0, top=max(weights, default=1) * 1.3)
+    ax_wt.grid(True, axis="y", alpha=0.25, linestyle="--")
+    ax_wt.set_ylabel("Weight")
+
+    # ── Jitter annotation (light text below title) ────────────────────────────
+    jitter_txt = "  |  ".join(f"{lnk.line_name}: jitter {lnk.jitter_ms:.1f}ms" for lnk in links)
+    fig.text(0.5, 0.01, jitter_txt, ha="center", fontsize=7, color="#666")
+
+    if title:
+        fig.suptitle(title, fontsize=10, fontweight="bold", y=1.02)
 
     fig.tight_layout()
     return _png(fig)

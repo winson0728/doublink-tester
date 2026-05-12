@@ -229,3 +229,50 @@ class TrafficResult:
     started_at: float = 0.0
     ended_at: float = 0.0
     timeseries: list[TrafficTimepoint] = field(default_factory=list)
+
+
+@dataclass
+class LinkInfo:
+    """Real-time status of one Doublink multilink path.
+
+    Sourced from GET /api/v1/agents/{agent_id}/links.
+
+    Fields follow the Doublink API naming with minor normalisation:
+      socket_id 0 = LINE A (5G), 1 = LINE B (WiFi).
+    """
+
+    socket_id: int             # 0 = LINE A, 1 = LINE B
+    address: str               # Original IP:port seen by Doublink
+    latency_ms: float          # Current RTT (ms)
+    latency_min_ms: float      # Historical minimum RTT
+    latency_max_ms: float      # Historical maximum RTT
+    jitter_ms: float           # Latency variation (ms)
+    latency_diff_ms: float     # RTT delta vs other link (positive = this link is slower)
+    loss_from_pct: float       # Packet loss rate inbound to agent (%)
+    loss_to_pct: float         # Packet loss rate outbound from agent (%)
+    weight: int                # ATSSS traffic-steering weight (0–100 per link)
+    inbound_throughput: float  # Current inbound data rate (API native unit)
+    outbound_throughput: float # Current outbound data rate (API native unit)
+
+    @property
+    def line_name(self) -> str:
+        """Human-readable line label for reports."""
+        return {0: "LINE_A (5G)", 1: "LINE_B (WiFi)"}.get(self.socket_id, f"LINK_{self.socket_id}")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a JSON-friendly dict."""
+        return {
+            "line": self.line_name,
+            "socket_id": self.socket_id,
+            "address": self.address,
+            "latency_ms": self.latency_ms,
+            "latency_min_ms": self.latency_min_ms,
+            "latency_max_ms": self.latency_max_ms,
+            "jitter_ms": self.jitter_ms,
+            "latency_diff_ms": self.latency_diff_ms,
+            "loss_from_pct": self.loss_from_pct,
+            "loss_to_pct": self.loss_to_pct,
+            "weight": self.weight,
+            "inbound_throughput": self.inbound_throughput,
+            "outbound_throughput": self.outbound_throughput,
+        }

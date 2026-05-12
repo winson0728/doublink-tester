@@ -48,6 +48,7 @@ class TestModeTransitions:
         set_multilink_mode,
         apply_network_condition,
         iperf3_runner,
+        link_snapshot,
         settings,
     ):
         """Switch mode while traffic is running and verify continuity."""
@@ -60,17 +61,24 @@ class TestModeTransitions:
         if net_condition != "clean":
             await apply_network_condition(net_condition)
 
-        # 3. Measure baseline before switch
+        # 3. Capture link status before switch (shows pre-switch algorithm state)
+        await link_snapshot(f"links_before_switch ({from_mode})")
+
+        # 4. Measure baseline before switch
         baseline = await iperf3_runner(protocol="tcp", duration_s=5)
 
-        # 4. Switch mode
+        # 5. Switch mode
         switch_result = await set_multilink_mode(to_mode)
 
-        # 5. Wait for mode to settle then measure again
+        # 6. Wait for mode to settle then measure again
         await asyncio.sleep(settings.timeouts.mode_switch_s)
+
+        # 7. Capture link status after switch (shows how algorithm adapted)
+        await link_snapshot(f"links_after_switch ({to_mode})")
+
         after_switch = await iperf3_runner(protocol="tcp", duration_s=10)
 
-        # 6. Attach results
+        # 8. Attach results
         allure.attach(
             json.dumps({
                 "from_mode": from_mode,
@@ -85,7 +93,7 @@ class TestModeTransitions:
             attachment_type=allure.attachment_type.JSON,
         )
 
-        # 7. Assert traffic recovered after switch
+        # 9. Assert traffic recovered after switch
         min_recovery_pct = assertions.get("min_throughput_recovery_pct", 50)
         if baseline.throughput_mbps > 0:
             recovery_pct = (after_switch.throughput_mbps / baseline.throughput_mbps) * 100

@@ -341,6 +341,7 @@ class TestSteeringBehaviour:
         set_multilink_mode,
         apply_network_condition,
         iperf3_runner,
+        link_snapshot,
     ):
         """When one link is degraded, ATSSS should steer traffic to the healthy link.
 
@@ -356,7 +357,15 @@ class TestSteeringBehaviour:
         await set_multilink_mode("real_time")
         await apply_network_condition(profile_id)
 
+        # Capture link status BEFORE iperf3 — shows ATSSS weight/latency allocation
+        # immediately after network conditions are applied.  This is the key diagnostic
+        # data: if ATSSS steered correctly, the degraded link should have a lower weight.
+        await link_snapshot(f"links_pre_traffic ({profile_id})")
+
         result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+
+        # Capture link status DURING/AFTER iperf3 — shows weights under load
+        await link_snapshot(f"links_post_traffic ({profile_id})")
 
         allure.attach(
             json.dumps({

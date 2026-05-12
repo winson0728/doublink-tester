@@ -17,6 +17,8 @@ from typing import Any
 
 import httpx
 
+from doublink_tester.models import LinkInfo
+
 logger = logging.getLogger(__name__)
 
 # Mapping from mode name → numeric API value
@@ -69,6 +71,10 @@ class MultilinkClient:
     def _agent_mode_url(self, agent_id: str | None = None) -> str:
         aid = agent_id or self._agent_id
         return f"/api/v1/agents/{aid}/mode"
+
+    def _agent_links_url(self, agent_id: str | None = None) -> str:
+        aid = agent_id or self._agent_id
+        return f"/api/v1/agents/{aid}/links"
 
     # ── Mode Control ────────────────────────────────────────────
 
@@ -143,13 +149,61 @@ class MultilinkClient:
             ]
         ]
 
-    # ── Link Status (via mode query) ────────────────────────────
+    # ── Link Status ─────────────────────────────────────────────
+
+    async def get_links(self, agent_id: str | None = None) -> list[LinkInfo]:
+        """Fetch real-time status of all multilink paths.
+
+        Calls GET /api/v1/agents/{agent_id}/links and returns a list of
+        :class:`LinkInfo` objects sorted by socket_id (0=LINE A/5G first).
+
+        Each LinkInfo contains:
+          • latency (current / min / max), jitter, latency_diff
+          • loss_from_pct, loss_to_pct
+          • weight  — the ATSSS traffic-steering weight for this link
+          • inbound_throughput / outbound_throughput (API native units)
+
+        Example::
+
+            links = await multilink_client.get_links()
+            for lnk in links:
+                print(f"{lnk.line_name}: latency={lnk.latency_ms}ms weight={lnk.weight}")
+        """
+        url = self._agent_links_url(agent_id)
+        resp = await self._client.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+
+        links: list[LinkInfo] = []
+        for item in data.get("links", []):
+            links.append(LinkInfo(
+                socket_id=item.get("Socket Id", -1),
+                address=item.get("Original Address", ""),
+                latency_ms=float(item.get("latency", 0)),
+                latency_min_ms=float(item.get("min latency", 0)),
+                latency_max_ms=float(item.get("max latency", 0)),
+                jitter_ms=float(item.get("latency variation", 0)),
+                latency_diff_ms=float(item.get("latency diff", 0)),
+                loss_from_pct=float(item.get("loss from", 0)),
+                loss_to_pct=float(item.get("loss to", 0)),
+                weight=int(item.get("weight", 0)),
+                inbound_throughput=float(item.get("inbound throughput", 0)),
+                outbound_throughput=float(item.get("outbound throughput", 0)),
+            ))
+
+        return sorted(links, key=lambda lnk: lnk.socket_id)
 
     async def get_link_status(self, agent_id: str | None = None) -> list[dict[str, Any]]:
-        """Return agent mode info as link status proxy."""
-        mode_info = await self.get_current_mode(agent_id)
-        return [mode_info]
+        """Return link status as plain dicts (compatibility alias for get_links)."""
+        links = await self.get_links(agent_id)
+        return [lnk.to_dict() for lnk in links]
 
     async def get_statistics(self, agent_id: str | None = None) -> dict[str, Any]:
-        """Return current mode as statistics."""
-        return await self.get_current_mode(agent_id)
+        """Return current mode and link status combined."""
+        mode = await self.get_current_mode(agent_id)
+        try:
+            links = await self.get_links(agent_id)
+            mode["links"] = [lnk.to_dict() for lnk in links]
+        except Exception:
+            mode["links"] = []
+        return mode

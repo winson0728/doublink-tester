@@ -1,13 +1,144 @@
-"""Multilink mode fixtures — set/restore multilink operating modes."""
+"""Multilink mode fixtures — set/restore modes and capture link status snapshots."""
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime, timezone
+from typing import Callable
 
+import allure
 import pytest_asyncio
+
+from doublink_tester.models import LinkInfo
+from doublink_tester.metrics.chart import generate_link_snapshot_chart
 
 logger = logging.getLogger(__name__)
 
+
+# ── Internal helpers ────────────────────────────────────────────────────────────
+
+def _links_to_json(links: list[LinkInfo], mode: str = "", label: str = "") -> str:
+    """Serialise link status to a pretty JSON string."""
+    return json.dumps(
+        {
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "mode": mode,
+            "label": label,
+            "links": [lnk.to_dict() for lnk in links],
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+def _attach_link_snapshot(
+    links: list[LinkInfo],
+    mode: str = "",
+    label: str = "link_status",
+    with_chart: bool = True,
+) -> None:
+    """Attach a link status JSON (and optional PNG chart) to the current Allure step."""
+    json_str = _links_to_json(links, mode=mode, label=label)
+    allure.attach(
+        json_str,
+        name=f"{label}.json",
+        attachment_type=allure.attachment_type.JSON,
+    )
+    if with_chart:
+        chart_bytes = generate_link_snapshot_chart(links, title=label)
+        if chart_bytes:
+            allure.attach(
+                chart_bytes,
+                name=f"{label}.png",
+                attachment_type=allure.attachment_type.PNG,
+            )
+
+
+async def _safe_get_links(multilink_client) -> tuple[list[LinkInfo], str]:
+    """Fetch link status and current mode; returns (links, mode_name) on success."""
+    try:
+        links = await multilink_client.get_links()
+        mode_info = await multilink_client.get_current_mode()
+        mode_name = mode_info.get("mode_name", "")
+        return links, mode_name
+    except Exception as exc:
+        logger.warning("link snapshot: API call failed — %s", exc)
+        return [], ""
+
+
+# ── Fixtures ────────────────────────────────────────────────────────────────────
+
+@pytest_asyncio.fixture(loop_scope="session", autouse=True)
+async def link_status_autolog(multilink_client):
+    """Autouse: attach link status snapshots before and after every test.
+
+    Each test automatically receives two Allure attachments:
+      • ``link_status_before.json`` / ``link_status_before.png`` — captured
+        just before the test body runs, reflecting any residual state from the
+        previous test.
+      • ``link_status_after.json`` / ``link_status_after.png`` — captured
+        immediately after the test body (and before teardown), showing how the
+        multilink algorithm adapted during the test.
+
+    The JSON fields (latency, jitter, loss, weight) are the raw values reported
+    by the Doublink server API and can be used to correlate algorithm decisions
+    with observed traffic behaviour.
+
+    Failures in this fixture (e.g. API unreachable) are silently logged so they
+    never cause a test to fail.
+    """
+    links_before, mode_before = await _safe_get_links(multilink_client)
+    if links_before:
+        _attach_link_snapshot(links_before, mode=mode_before, label="link_status_before")
+
+    yield
+
+    links_after, mode_after = await _safe_get_links(multilink_client)
+    if links_after:
+        _attach_link_snapshot(links_after, mode=mode_after, label="link_status_after")
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def link_snapshot(multilink_client) -> Callable:
+    """Factory fixture: take a named link status snapshot at any point in a test.
+
+    Returns an async callable.  Call it with a label whenever you want to capture
+    the instantaneous link state — e.g. just after a mode switch or midway through
+    a long iperf3 run.
+
+    Usage::
+
+        async def test_mode_switch(set_multilink_mode, link_snapshot, iperf3_runner):
+            await set_multilink_mode("bonding")
+            await link_snapshot("after_bonding_set")
+
+            result = await iperf3_runner(duration_s=15)
+
+            await set_multilink_mode("duplicate")
+            await link_snapshot("after_switch_to_duplicate")
+
+    Each call attaches a JSON + PNG chart to the Allure report for that test.
+    """
+    async def _snap(label: str = "link_snapshot", with_chart: bool = True) -> list[LinkInfo]:
+        links, mode = await _safe_get_links(multilink_client)
+        if links:
+            _attach_link_snapshot(links, mode=mode, label=label, with_chart=with_chart)
+            logger.info(
+                "link_snapshot [%s] mode=%s  %s",
+                label, mode,
+                "  ".join(
+                    f"{lnk.line_name}: lat={lnk.latency_ms:.0f}ms "
+                    f"loss={lnk.loss_from_pct:.1f}% wt={lnk.weight}"
+                    for lnk in links
+                ),
+            )
+        return links
+
+    return _snap
+
+
+# ── Mode control ────────────────────────────────────────────────────────────────
 
 @pytest_asyncio.fixture(loop_scope="session")
 async def set_multilink_mode(multilink_client, multilink_modes):
