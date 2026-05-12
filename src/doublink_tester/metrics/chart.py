@@ -1,10 +1,17 @@
 """Chart generation for Allure test reports.
 
-Three entry points:
+Four entry points:
 
-* ``generate_single_chart(result, ...)``      — single iperf3 run throughput timeline
-* ``generate_combined_chart(results, ...)``   — multiple runs stitched end-to-end
-* ``generate_link_snapshot_chart(links, ...)``— link quality snapshot (latency/loss/weight)
+* ``generate_single_chart(result, ...)``
+      Single iperf3 run throughput timeline.
+* ``generate_combined_chart(results, ...)``
+      Multiple iperf3 runs stitched end-to-end with event markers.
+* ``generate_traffic_link_chart(result, link_samples, ...)``
+      **Primary chart**: iperf3 throughput + concurrent link quality sampling
+      (latency / weight / loss per link) on a shared time axis.  Use this to
+      correlate algorithm decisions (weight shifts) with measured throughput.
+* ``generate_link_snapshot_chart(links, ...)``
+      Static 3-bar snapshot of current link quality — used for before/after views.
 
 matplotlib is an optional dev dependency.  If it is not installed the functions
 return empty bytes and tests continue to run normally.
@@ -14,6 +21,7 @@ from __future__ import annotations
 
 import io
 import logging
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -245,6 +253,181 @@ def generate_combined_chart(
 
     if title:
         fig.suptitle(title, fontsize=11, fontweight="bold")
+
+    fig.tight_layout()
+    return _png(fig)
+
+
+# ── Line colours: LINE A (5G) = blue, LINE B (WiFi) = green ───────────────────
+_LINK_COLORS = {0: "#1565C0", 1: "#2E7D32"}   # socket_id → colour
+_LINK_COLORS_LIGHT = {0: "#90CAF9", 1: "#A5D6A7"}
+
+
+def generate_traffic_link_chart(
+    result: "TrafficResult",
+    link_samples: "list[tuple[float, list[LinkInfo]]]",
+    title: str = "",
+    events: list[tuple[float, str]] | None = None,
+) -> bytes:
+    """Generate a combined iperf3-throughput + link-quality time-series chart.
+
+    Produces a **3-panel figure** with a shared time axis so you can directly
+    see how ATSSS algorithm decisions (weight shifts, latency changes) correlate
+    with observed throughput:
+
+    Panel 1 (tall) — Throughput (Mbps, left Y) overlaid with ATSSS weight per
+                     link (right Y, dashed).  A drop or rise in weight shows
+                     exactly when the algorithm favoured or penalised a path.
+
+    Panel 2        — RTT (ms) per link sampled every ~1 s.  Rising latency on
+                     one link should precede a weight reduction.
+
+    Panel 3        — Packet loss % per link (inbound solid, outbound dotted).
+
+    All three panels share the X axis and display the same event markers.
+
+    Args:
+        result:       TrafficResult from iperf3 (must have non-empty timeseries).
+        link_samples: List of ``(t_elapsed_s, [LinkInfo, ...])`` tuples collected
+                      concurrently with the iperf3 run (typically at 1 Hz).
+        title:        Optional chart title.
+        events:       Mode-switch / network-change markers: ``[(t_s, label), ...]``.
+
+    Returns:
+        PNG bytes, or ``b""`` if matplotlib unavailable or no iperf3 data.
+    """
+    if not _HAS_MPL or not result.timeseries:
+        return b""
+
+    # Fall back to the simple chart when no link data was collected
+    if not link_samples:
+        return generate_single_chart(result, title=title, events=events)
+
+    events = events or []
+
+    # ── iperf3 time-series ─────────────────────────────────────────────────────
+    pts = result.timeseries
+    tp_times = [p.t_start for p in pts]
+    tp_vals  = [p.throughput_mbps for p in pts]
+    has_udp_loss = any(p.loss_pct > 0 for p in pts)
+
+    # ── Link samples → per-socket time-series dict ─────────────────────────────
+    # lts[socket_id] = {"t": [...], "latency": [...], "weight": [...], ...}
+    lts: dict[int, dict] = defaultdict(
+        lambda: {"t": [], "latency": [], "weight": [], "loss_from": [], "loss_to": [], "name": ""}
+    )
+    for t, links in link_samples:
+        for lnk in links:
+            d = lts[lnk.socket_id]
+            d["t"].append(t)
+            d["latency"].append(lnk.latency_ms)
+            d["weight"].append(lnk.weight)
+            d["loss_from"].append(lnk.loss_from_pct)
+            d["loss_to"].append(lnk.loss_to_pct)
+            if not d["name"]:
+                d["name"] = lnk.line_name
+
+    # ── Figure layout: 3 rows, shared X ───────────────────────────────────────
+    fig, axes = plt.subplots(
+        3, 1,
+        figsize=(13, 9),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3, 1.8, 1.4]},
+    )
+    fig.subplots_adjust(hspace=0.06)
+    ax_tp, ax_lat, ax_loss = axes
+
+    # ── Panel 1: Throughput (left Y) + ATSSS Weight (right Y) ─────────────────
+    tp_col = "#1565C0"
+    ax_tp.fill_between(tp_times, tp_vals, alpha=0.12, color=tp_col)
+    ax_tp.plot(tp_times, tp_vals, color=tp_col, linewidth=1.8,
+               label=f"{result.protocol.upper()} Throughput")
+    avg = sum(tp_vals) / len(tp_vals)
+    ax_tp.axhline(y=avg, color=tp_col, linestyle=":", linewidth=1.0, alpha=_AVG_COLOR_ALPHA)
+    ax_tp.text(tp_times[-1] * 0.98, avg * 1.02, f"avg {avg:.1f} Mbps",
+               color=tp_col, fontsize=7, ha="right", va="bottom", alpha=0.8)
+
+    # UDP loss on left axis secondary
+    if has_udp_loss:
+        ax_udp_loss = ax_tp.twinx()
+        udp_losses = [p.loss_pct for p in pts]
+        ax_udp_loss.plot(tp_times, udp_losses, color=_LOSS_COLOR, linewidth=1.0,
+                         linestyle=":", alpha=0.7, label="UDP Loss %")
+        ax_udp_loss.set_ylabel("UDP Loss (%)", color=_LOSS_COLOR, fontsize=8)
+        ax_udp_loss.tick_params(axis="y", labelcolor=_LOSS_COLOR, labelsize=7)
+        ax_udp_loss.set_ylim(bottom=0)
+
+    _style_ax(ax_tp, "Throughput (Mbps)", tp_col)
+
+    # ATSSS weight overlay on right Y (only if we have link data)
+    ax_wt = ax_tp.twinx()
+    if has_udp_loss:
+        # Offset the weight axis spine to avoid overlap with UDP loss axis
+        ax_wt.spines["right"].set_position(("outward", 55))
+    for sid in sorted(lts.keys()):
+        d = lts[sid]
+        c = _LINK_COLORS.get(sid, _PHASE_COLORS[sid % len(_PHASE_COLORS)])
+        ax_wt.plot(d["t"], d["weight"], color=c, linewidth=1.5, linestyle="--",
+                   alpha=0.80, label=f'{d["name"]} weight')
+        # Mark weight change points with small markers
+        for i in range(1, len(d["weight"])):
+            if d["weight"][i] != d["weight"][i - 1]:
+                ax_wt.axvline(x=d["t"][i], color=c, linewidth=0.6,
+                               linestyle=":", alpha=0.35, zorder=2)
+    ax_wt.set_ylabel("ATSSS Weight →", color="#555", fontsize=8)
+    ax_wt.tick_params(axis="y", labelcolor="#555", labelsize=7)
+    ax_wt.set_ylim(bottom=0)
+    ax_wt.yaxis.set_major_formatter(mticker.FormatStrFormatter("%g"))
+
+    # Combined legend for Panel 1
+    h1, lb1 = ax_tp.get_legend_handles_labels()
+    h2, lb2 = ax_wt.get_legend_handles_labels()
+    if has_udp_loss:
+        h3, lb3 = ax_udp_loss.get_legend_handles_labels()
+        h1, lb1 = h1 + h3, lb1 + lb3
+    ax_tp.legend(h1 + h2, lb1 + lb2, loc="upper left", fontsize=7.5, framealpha=0.8)
+
+    _draw_events(ax_tp, events)
+
+    # ── Panel 2: RTT per link ─────────────────────────────────────────────────
+    for sid in sorted(lts.keys()):
+        d = lts[sid]
+        c = _LINK_COLORS.get(sid, _PHASE_COLORS[sid % len(_PHASE_COLORS)])
+        cl = _LINK_COLORS_LIGHT.get(sid, c)
+        ax_lat.plot(d["t"], d["latency"], color=c, linewidth=1.6,
+                    label=d["name"], alpha=0.9, zorder=4)
+        ax_lat.fill_between(d["t"], d["latency"], alpha=0.08, color=c)
+    _style_ax(ax_lat, "RTT (ms)", "#333")
+    ax_lat.legend(loc="upper right", fontsize=7.5, framealpha=0.8)
+    _draw_events(ax_lat, events)
+
+    # ── Panel 3: Packet loss per link ─────────────────────────────────────────
+    any_loss = any(
+        max(d["loss_from"] + d["loss_to"], default=0) > 0
+        for d in lts.values()
+    )
+    for sid in sorted(lts.keys()):
+        d = lts[sid]
+        c = _LINK_COLORS.get(sid, _PHASE_COLORS[sid % len(_PHASE_COLORS)])
+        ax_loss.plot(d["t"], d["loss_from"], color=c, linewidth=1.4,
+                     label=f'{d["name"]} inbound', alpha=0.85, zorder=4)
+        ax_loss.plot(d["t"], d["loss_to"], color=c, linewidth=0.9,
+                     linestyle=":", label=f'{d["name"]} outbound', alpha=0.60, zorder=3)
+    _style_ax(ax_loss, "Link Loss (%)", "#333")
+    ax_loss.set_xlabel("Time (s)")
+    ax_loss.legend(loc="upper right", fontsize=7, ncol=2, framealpha=0.8)
+    _draw_events(ax_loss, events)
+
+    # ── Annotation: sample count ───────────────────────────────────────────────
+    n_samples = len(link_samples)
+    fig.text(
+        0.99, 0.005,
+        f"link samples: {n_samples}  |  iperf3 intervals: {len(pts)}",
+        ha="right", va="bottom", fontsize=6.5, color="#999",
+    )
+
+    if title:
+        fig.suptitle(title, fontsize=11, fontweight="bold", y=1.005)
 
     fig.tight_layout()
     return _png(fig)
