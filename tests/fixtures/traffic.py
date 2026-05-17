@@ -1,7 +1,7 @@
 """Traffic generator fixtures — create, run, and auto-cleanup traffic generators.
 
 Every iperf3 run automatically:
-  1. Polls the Doublink /links API every second **concurrently** with the iperf3
+  1. Polls the Doublink /links API every 3 s **concurrently** with the iperf3
      measurement, collecting per-link latency, jitter, loss, and ATSSS weight.
   2. Stitches the iperf3 per-second throughput together with the link samples
      into a single 3-panel chart:
@@ -35,8 +35,12 @@ from doublink_tester.metrics.chart import (
 
 logger = logging.getLogger(__name__)
 
-# How often to poll the /links API during iperf3 runs (seconds)
-_LINK_POLL_INTERVAL = 1.0
+# How often to poll the /links API during iperf3 runs (seconds).
+# 3 s is a balance between weight-shift visibility (algorithm decisions happen
+# on a ~10 s cadence) and chart-rendering cost.  At 3 s a 5-minute iperf3 run
+# produces ~100 link samples — enough resolution to see Steering events while
+# keeping Allure attachment + matplotlib loading time low.
+_LINK_POLL_INTERVAL = 3.0
 
 
 def _attach_chart(chart_bytes: bytes, name: str) -> None:
@@ -76,7 +80,7 @@ async def _poll_links_task(
     stop_event: asyncio.Event,
     samples: list,          # list of (t_elapsed, [LinkInfo, ...])
 ) -> None:
-    """Background task: poll /links API at 1 Hz until stop_event is set.
+    """Background task: poll /links API every _LINK_POLL_INTERVAL s until stop_event is set.
 
     Samples are appended to *samples* as ``(t_elapsed_seconds, [LinkInfo, ...])``.
     All errors are silently logged so a broken API never fails an iperf3 test.
@@ -106,7 +110,7 @@ async def iperf3_runner(settings, multilink_client):
     """Factory fixture: run iperf3 while concurrently sampling link quality.
 
     **Automatic combined chart**: while iperf3 measures throughput, a background
-    task polls ``GET /api/v1/agents/{id}/links`` every second.  After the run the
+    task polls ``GET /api/v1/agents/{id}/links`` every 3 s.  After the run the
     fixture generates a 3-panel PNG chart:
 
       Panel 1 — Throughput (Mbps, left Y) + ATSSS weight per link (right Y, dashed)

@@ -279,7 +279,7 @@ def generate_traffic_link_chart(
                      link (right Y, dashed).  A drop or rise in weight shows
                      exactly when the algorithm favoured or penalised a path.
 
-    Panel 2        — RTT (ms) per link sampled every ~1 s.  Rising latency on
+    Panel 2        — RTT (ms) per link sampled every ~3 s.  Rising latency on
                      one link should precede a weight reduction.
 
     Panel 3        — Packet loss % per link (inbound solid, outbound dotted).
@@ -289,7 +289,7 @@ def generate_traffic_link_chart(
     Args:
         result:       TrafficResult from iperf3 (must have non-empty timeseries).
         link_samples: List of ``(t_elapsed_s, [LinkInfo, ...])`` tuples collected
-                      concurrently with the iperf3 run (typically at 1 Hz).
+                      concurrently with the iperf3 run (typically every 3 s).
         title:        Optional chart title.
         events:       Mode-switch / network-change markers: ``[(t_s, label), ...]``.
 

@@ -38,7 +38,10 @@ class Iperf3Generator:
         host, _, port = target.partition(":")
         port = port or str(self._server_port)
 
-        cmd = ["iperf3", "-c", host, "-p", port, "-t", str(duration_s), "-J"]  # JSON output
+        # -i 3: report intervals every 3 s (aligns with link sampling cadence) —
+        # for long-duration runs (3-5 min) this cuts TrafficTimepoint count by ~3x
+        # and proportionally reduces matplotlib rendering + Allure attachment size.
+        cmd = ["iperf3", "-c", host, "-p", port, "-t", str(duration_s), "-i", "3", "-J"]
         if protocol == "udp":
             cmd.append("-u")
             if bandwidth:
