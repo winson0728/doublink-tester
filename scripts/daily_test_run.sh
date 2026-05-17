@@ -50,11 +50,31 @@ export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 git pull --ff-only 2>&1 | tee -a "$LOG_FILE" || warn "git pull 失敗，繼續使用現有版本"
 ok "程式碼版本: $(git log --oneline -1)"
 
-# ── Step 2: 清除舊的 allure results ─────────────────────────────
-log "Step 2/6: 清除舊的 allure-results..."
+# ── Step 2: 清除舊的 allure results（保留 history 供 TREND 使用）──────────
+log "Step 2/6: 清除舊的 allure-results（保留 history 供 TREND 使用）..."
+
+# 先把上次報告的 history 備份出來
+HISTORY_BACKUP="/tmp/allure-history-backup-$$"
+HISTORY_SAVED=false
+if [ -d "$PROJ_DIR/allure-report/history" ]; then
+  cp -r "$PROJ_DIR/allure-report/history" "$HISTORY_BACKUP"
+  HISTORY_SAVED=true
+  log "  → allure-report/history/ 已備份至 $HISTORY_BACKUP"
+else
+  warn "  → 無先前 history，TREND 將從本次開始累積"
+fi
+
 rm -rf "$PROJ_DIR/allure-results"
 mkdir -p "$PROJ_DIR/allure-results"
-ok "allure-results 已清除"
+
+# 把 history 放回 allure-results/history/，讓 allure generate 讀到
+if [ "$HISTORY_SAVED" = true ]; then
+  cp -r "$HISTORY_BACKUP" "$PROJ_DIR/allure-results/history"
+  rm -rf "$HISTORY_BACKUP"
+  ok "allure-results 已清除，history 已還原（TREND 可累積）"
+else
+  ok "allure-results 已清除（首次執行，無 history）"
+fi
 
 # ── Step 3: 執行 pytest ───────────────────────────────────────────
 log "Step 3/6: 執行全套測試（74 項，預計 ~30 分鐘）..."
