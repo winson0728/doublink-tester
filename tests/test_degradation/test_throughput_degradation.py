@@ -178,7 +178,7 @@ class TestTcpThroughputDegradation:
 
         await set_multilink_mode(mode_id)
 
-        result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+        result = await iperf3_runner(protocol="tcp", duration_s=180, parallel=4)
 
         allure.attach(
             json.dumps({
@@ -219,7 +219,7 @@ class TestTcpThroughputDegradation:
         await set_multilink_mode(mode_id)
         await apply_network_condition(condition)
 
-        result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+        result = await iperf3_runner(protocol="tcp", duration_s=180, parallel=4)
 
         allure.attach(
             json.dumps({
@@ -254,7 +254,7 @@ class TestUdpDegradation:
         """Establish UDP baseline with clean network."""
         allure.dynamic.title("UDP baseline — clean network")
 
-        result = await iperf3_runner(protocol="udp", duration_s=10, bandwidth="50M")
+        result = await iperf3_runner(protocol="udp", duration_s=180, bandwidth="50M")
 
         allure.attach(
             json.dumps({
@@ -293,7 +293,7 @@ class TestUdpDegradation:
 
         await apply_network_condition(condition)
 
-        result = await iperf3_runner(protocol="udp", duration_s=10, bandwidth="10M")
+        result = await iperf3_runner(protocol="udp", duration_s=180, bandwidth="10M")
 
         allure.attach(
             json.dumps({
@@ -362,7 +362,7 @@ class TestSteeringBehaviour:
         # data: if ATSSS steered correctly, the degraded link should have a lower weight.
         await link_snapshot(f"links_pre_traffic ({profile_id})")
 
-        result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+        result = await iperf3_runner(protocol="tcp", duration_s=180, parallel=4)
 
         # Capture link status DURING/AFTER iperf3 — shows weights under load
         await link_snapshot(f"links_post_traffic ({profile_id})")
@@ -408,15 +408,15 @@ class TestRecoveryAfterDegradation:
 
         # 1. Measure under congestion (both lines)
         rule_ids = await apply_network_condition("congested_recoverable")
-        degraded = await iperf3_runner(protocol="tcp", duration_s=10)
+        degraded = await iperf3_runner(protocol="tcp", duration_s=180)
 
         # 2. Clear all rules
         for rule_id in rule_ids:
             await netemu_client.clear_rule(rule_id)
-        await asyncio.sleep(settings.timeouts.network_settle_s)
+        await asyncio.sleep(10)
 
         # 3. Measure after recovery
-        recovered = await iperf3_runner(protocol="tcp", duration_s=10)
+        recovered = await iperf3_runner(protocol="tcp", duration_s=180)
 
         allure.attach(
             json.dumps({

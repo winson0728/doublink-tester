@@ -59,9 +59,9 @@ class TestModeComparison:
 
         # Determine test parameters from traffic profile name
         if "udp" in traffic_profile:
-            result = await iperf3_runner(protocol="udp", duration_s=10, bandwidth="50M")
+            result = await iperf3_runner(protocol="udp", duration_s=180, bandwidth="50M")
         else:
-            result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+            result = await iperf3_runner(protocol="tcp", duration_s=180, parallel=4)
 
         allure.attach(
             json.dumps({
@@ -114,7 +114,7 @@ class TestModeBaselineComparison:
         results = {}
         for mode in ["real_time", "bonding", "duplicate"]:
             await set_multilink_mode(mode)
-            result = await iperf3_runner(protocol="tcp", duration_s=10, parallel=4)
+            result = await iperf3_runner(protocol="tcp", duration_s=180, parallel=4)
             results[mode] = result.throughput_mbps
 
         allure.attach(
@@ -139,7 +139,7 @@ class TestModeBaselineComparison:
         results = {}
         for mode in ["real_time", "bonding", "duplicate"]:
             await set_multilink_mode(mode)
-            result = await iperf3_runner(protocol="udp", duration_s=10, bandwidth="50M")
+            result = await iperf3_runner(protocol="udp", duration_s=180, bandwidth="50M")
             results[mode] = {"throughput_mbps": result.throughput_mbps, "loss_pct": result.loss_pct, "jitter_ms": result.jitter_ms}
 
         allure.attach(

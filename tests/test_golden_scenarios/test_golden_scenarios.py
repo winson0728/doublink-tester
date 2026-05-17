@@ -45,7 +45,7 @@ class TestBondingAggregation:
 
         # 2. Set bonding mode and measure aggregate TCP throughput
         await set_multilink_mode("bonding")
-        result = await iperf3_runner(protocol="tcp", duration_s=15, parallel=4)
+        result = await iperf3_runner(protocol="tcp", duration_s=180, parallel=4)
 
         allure.attach(
             json.dumps({
@@ -82,7 +82,7 @@ class TestBondingAggregation:
 
         # 2. Set bonding mode and measure aggregate TCP throughput
         await set_multilink_mode("bonding")
-        result = await iperf3_runner(protocol="tcp", duration_s=15, parallel=4)
+        result = await iperf3_runner(protocol="tcp", duration_s=180, parallel=4)
 
         allure.attach(
             json.dumps({
@@ -130,7 +130,7 @@ class TestFailoverContinuity:
         await apply_network_condition("golden_hard_failover")
 
         # 3. Run iperf3 for 30 seconds — covers multiple disconnect cycles
-        result = await iperf3_runner(protocol="tcp", duration_s=30)
+        result = await iperf3_runner(protocol="tcp", duration_s=300)
 
         allure.attach(
             json.dumps({
@@ -168,7 +168,7 @@ class TestFailoverContinuity:
         await apply_network_condition("golden_intermittent_flap")
 
         # 3. Run iperf3 for 60 seconds — covers multiple 15s flap cycles
-        result = await iperf3_runner(protocol="tcp", duration_s=60)
+        result = await iperf3_runner(protocol="tcp", duration_s=300)
 
         allure.attach(
             json.dumps({
@@ -213,11 +213,11 @@ class TestDuplicateReliability:
 
         # 2. Measure duplicate mode throughput
         await set_multilink_mode("duplicate")
-        duplicate_result = await iperf3_runner(protocol="tcp", duration_s=15)
+        duplicate_result = await iperf3_runner(protocol="tcp", duration_s=180)
 
         # 3. Measure bonding mode throughput
         await set_multilink_mode("bonding")
-        bonding_result = await iperf3_runner(protocol="tcp", duration_s=15)
+        bonding_result = await iperf3_runner(protocol="tcp", duration_s=180)
 
         allure.attach(
             json.dumps({
@@ -257,7 +257,7 @@ class TestDuplicateReliability:
         await apply_network_condition("golden_burst_loss")
 
         # 3. Run iperf3 for 20 seconds to cover loss fluctuation patterns
-        result = await iperf3_runner(protocol="tcp", duration_s=20)
+        result = await iperf3_runner(protocol="tcp", duration_s=300)
 
         allure.attach(
             json.dumps({

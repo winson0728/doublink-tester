@@ -65,7 +65,7 @@ class TestModeTransitions:
         await link_snapshot(f"links_before_switch ({from_mode})")
 
         # 4. Measure baseline before switch
-        baseline = await iperf3_runner(protocol="tcp", duration_s=5)
+        baseline = await iperf3_runner(protocol="tcp", duration_s=30)
 
         # 5. Switch mode
         switch_result = await set_multilink_mode(to_mode)
@@ -76,7 +76,7 @@ class TestModeTransitions:
         # 7. Capture link status after switch (shows how algorithm adapted)
         await link_snapshot(f"links_after_switch ({to_mode})")
 
-        after_switch = await iperf3_runner(protocol="tcp", duration_s=10)
+        after_switch = await iperf3_runner(protocol="tcp", duration_s=180)
 
         # 8. Attach results
         allure.attach(
@@ -159,7 +159,7 @@ class TestModeSwitchUnderLoad:
         target = f"{settings.iperf3_server}:5201"
 
         # Start a 15-second iperf3 run
-        await gen.start(target=target, duration_s=15, protocol="tcp", parallel=2)
+        await gen.start(target=target, duration_s=180, protocol="tcp", parallel=2)
 
         # Wait 5 seconds, then switch mode
         await asyncio.sleep(5)

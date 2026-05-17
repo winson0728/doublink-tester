@@ -42,13 +42,13 @@ class TestLinkDisconnectFailover:
         await set_multilink_mode("bonding")
 
         # 2. Baseline throughput — both links healthy
-        baseline = await iperf3_runner(protocol="tcp", duration_s=5)
+        baseline = await iperf3_runner(protocol="tcp", duration_s=30)
 
         # 3. Apply disconnect profile (100% loss on one link)
         await apply_network_condition(disconnect_profile)
 
         # 4. Measure during failover
-        during = await iperf3_runner(protocol="tcp", duration_s=10)
+        during = await iperf3_runner(protocol="tcp", duration_s=180)
 
         allure.attach(
             json.dumps({
@@ -86,7 +86,7 @@ class TestLinkDisconnectFailover:
         # Disconnect 5G
         await apply_network_condition("5g_disconnect_visible")
 
-        result = await iperf3_runner(protocol="tcp", duration_s=10)
+        result = await iperf3_runner(protocol="tcp", duration_s=180)
 
         allure.attach(
             json.dumps({
@@ -129,7 +129,7 @@ class TestIntermittentDisconnect:
         await apply_network_condition(profile_id)
 
         # Run long enough to cover at least 2 disconnect cycles
-        result = await iperf3_runner(protocol="tcp", duration_s=20, parallel=2)
+        result = await iperf3_runner(protocol="tcp", duration_s=300, parallel=2)
 
         allure.attach(
             json.dumps({
@@ -167,7 +167,7 @@ class TestIntermittentDisconnect:
         target = f"{settings.iperf3_server}:5201"
 
         # Start 20-second iperf3
-        await gen.start(target=target, duration_s=20, protocol="tcp", parallel=2)
+        await gen.start(target=target, duration_s=300, protocol="tcp", parallel=2)
 
         # Schedule a 3-second disconnect on LINE A DL at second 5
         await asyncio.sleep(5)
@@ -215,15 +215,15 @@ class TestRecoveryAfterDisconnect:
 
         # 1. Disconnect 5G
         rule_ids = await apply_network_condition("5g_disconnect_visible")
-        during = await iperf3_runner(protocol="tcp", duration_s=5)
+        during = await iperf3_runner(protocol="tcp", duration_s=30)
 
         # 2. Reconnect by clearing rules
         for rule_id in rule_ids:
             await netemu_client.clear_rule(rule_id)
-        await asyncio.sleep(settings.timeouts.network_settle_s)
+        await asyncio.sleep(10)
 
         # 3. Measure after recovery
-        after = await iperf3_runner(protocol="tcp", duration_s=5)
+        after = await iperf3_runner(protocol="tcp", duration_s=30)
 
         allure.attach(
             json.dumps({
