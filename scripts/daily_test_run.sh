@@ -2,7 +2,8 @@
 # =============================================================================
 # daily_test_run.sh — 每日自動測試 + 報告生成
 #
-# 排程：每日 04:00 由 cron 執行
+# 排程：每日 02:00 由 cron 執行（測試時長延長至 ~3h 50min 後，提前開始以避開
+#       工作時段；預計 02:00 → 約 05:50 完成）
 # 輸出：
 #   ~/doublink-tester/allure-results/   → allure JSON 原始結果
 #   ~/doublink-tester/allure-report/    → allure HTML 報告
