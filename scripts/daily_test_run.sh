@@ -113,6 +113,14 @@ if command -v allure &>/dev/null; then
     -o "$PROJ_DIR/allure-report" \
     --clean 2>&1 | tee -a "$LOG_FILE"
   ok "Allure HTML 報告已生成：allure-report/"
+
+  # 修剪 history JSON 檔避免長期無上限累積（保留最近 90 次 run）。
+  # 此步驟在 generate 之後做，所以下次 Step 2 備份到的 history 就是已修剪的版本。
+  HISTORY_KEEP=90
+  log "  修剪 allure-report/history/ 保留最近 ${HISTORY_KEEP} 次 run ..."
+  $PYTHON "$PROJ_DIR/scripts/prune_allure_history.py" \
+    "$PROJ_DIR/allure-report/history" "$HISTORY_KEEP" 2>&1 | tee -a "$LOG_FILE" \
+    || warn "history 修剪失敗（不影響本次報告）"
 else
   warn "allure 未安裝，跳過 HTML 報告生成"
   warn "安裝方式：sudo apt-get install default-jre-headless && wget .../allure-2.29.0.tgz"
