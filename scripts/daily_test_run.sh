@@ -26,6 +26,8 @@ LATEST_DOCX="$REPORTS_DIR/doublink_test_report_latest.docx"
 HTTP_PORT=8888
 PYTHON=python3
 PYTEST_TIMEOUT=900
+NETEMU_URL="http://192.168.105.115:8080"
+UE_PING_IP="10.10.10.1"            # tester ens19 對端（Doublinks UE）
 
 # ── 顏色輸出 ─────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -46,13 +48,13 @@ echo "============================================================" >> "$LOG_FIL
 cd "$PROJ_DIR"
 
 # ── Step 1: git pull ──────────────────────────────────────────────
-log "Step 1/6: git pull 最新程式碼..."
+log "Step 1/7: git pull 最新程式碼..."
 export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 git pull --ff-only 2>&1 | tee -a "$LOG_FILE" || warn "git pull 失敗，繼續使用現有版本"
 ok "程式碼版本: $(git log --oneline -1)"
 
 # ── Step 2: 清除舊的 allure results（保留 history 供 TREND 使用）──────────
-log "Step 2/6: 清除舊的 allure-results（保留 history 供 TREND 使用）..."
+log "Step 2/7: 清除舊的 allure-results（保留 history 供 TREND 使用）..."
 
 # 先把上次報告的 history 備份出來
 HISTORY_BACKUP="/tmp/allure-history-backup-$$"
@@ -77,8 +79,65 @@ else
   ok "allure-results 已清除（首次執行，無 history）"
 fi
 
-# ── Step 3: 執行 pytest ───────────────────────────────────────────
-log "Step 3/6: 執行全套測試（74 項，預計 ~30 分鐘）..."
+# ── Step 3: NetEmu bridge 健康檢查（若 DOWN 自動重建）────────────
+# NetEmu service 重啟或 VM 重開機後，kernel-level bridge 不會自動帶回來。
+# 沒有 bridge → wan_a_in/wan_b_in 收到的封包不會 forward 到 lan_a_out/lan_b_out
+# → tester 整個測試環境連通中斷。
+# 這一步在 pytest 之前確保 bridge 處於 forwarding 狀態。
+log "Step 3/7: 檢查 NetEmu bridge 狀態..."
+
+check_netemu_bridge_up() {
+  # 回傳 "UP"、"DOWN"、或 "ERROR"
+  curl -sL -m 5 "$NETEMU_URL/api/interfaces/" 2>/dev/null \
+    | $PYTHON -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    bridges = [i for i in data if i["name"].startswith("br_netemu_")]
+    if not bridges:
+        print("DOWN")  # 沒有 bridge 物件存在
+    elif all(b["state"] == "UP" for b in bridges):
+        print("UP")
+    else:
+        print("DOWN")
+except Exception:
+    print("ERROR")
+' 2>/dev/null
+}
+
+BRIDGE_STATE=$(check_netemu_bridge_up)
+case "$BRIDGE_STATE" in
+  UP)
+    ok "NetEmu bridge 兩條 line 都 UP"
+    ;;
+  DOWN)
+    warn "NetEmu bridge 未就緒，嘗試重建 ..."
+    REBUILD_RESP=$(curl -sL -m 10 -X POST "$NETEMU_URL/api/rules/bridge" \
+      -H 'Content-Type: application/json' \
+      -d '{"lines":[{"downlink":"wan_a_in","uplink":"lan_a_out"},{"downlink":"wan_b_in","uplink":"lan_b_out"}]}' \
+      -w 'HTTP_%{http_code}' 2>&1)
+    log "  → 重建回應: $(echo "$REBUILD_RESP" | tail -c 200)"
+    sleep 3
+    if [ "$(check_netemu_bridge_up)" = "UP" ]; then
+      ok "NetEmu bridge 重建成功"
+    else
+      err "NetEmu bridge 重建失敗 — 測試會大量 fail，但仍繼續執行"
+    fi
+    ;;
+  ERROR|*)
+    warn "無法連到 NetEmu API ($NETEMU_URL)，跳過 bridge 檢查（測試可能失敗）"
+    ;;
+esac
+
+# 額外驗證：tester 是否能 ping 到 Doublinks UE — 若不通 NetworkManager 還沒拿到 DHCP
+if ping -c 2 -W 2 "$UE_PING_IP" &>/dev/null; then
+  ok "Doublinks UE ($UE_PING_IP) 可達"
+else
+  warn "Doublinks UE ($UE_PING_IP) 不可達 — UE 設備本身可能有問題（非 NetEmu）"
+fi
+
+# ── Step 4: 執行 pytest ───────────────────────────────────────────
+log "Step 4/7: 執行全套測試（74 項，預計 ~3.5 小時）..."
 PYTEST_EXIT=0
 PYTHONPATH="$PROJ_DIR/src:${PYTHONPATH:-}" \
 $PYTHON -m pytest \
@@ -106,8 +165,8 @@ else
   err "pytest 結束碼 $PYTEST_EXIT：${PASSED} passed, ${FAILED} failed"
 fi
 
-# ── Step 4: 生成 Allure HTML 報告 ────────────────────────────────
-log "Step 4/6: 生成 Allure HTML 報告..."
+# ── Step 5: 生成 Allure HTML 報告 ────────────────────────────────
+log "Step 5/7: 生成 Allure HTML 報告..."
 if command -v allure &>/dev/null; then
   allure generate "$PROJ_DIR/allure-results" \
     -o "$PROJ_DIR/allure-report" \
@@ -126,8 +185,8 @@ else
   warn "安裝方式：sudo apt-get install default-jre-headless && wget .../allure-2.29.0.tgz"
 fi
 
-# ── Step 5: 生成 Word 報告 ────────────────────────────────────────
-log "Step 5/6: 生成 Word 測試報告..."
+# ── Step 6: 生成 Word 報告 ────────────────────────────────────────
+log "Step 6/7: 生成 Word 測試報告..."
 WORD_EXIT=0
 PYTHONPATH="$PROJ_DIR/src:${PYTHONPATH:-}" \
 $PYTHON scripts/generate_test_report.py \
@@ -143,8 +202,8 @@ else
   err "Word 報告生成失敗（exit $WORD_EXIT）"
 fi
 
-# ── Step 6: 啟動/重啟 HTTP server ────────────────────────────────
-log "Step 6/6: 重啟 HTTP 報告伺服器（port $HTTP_PORT）..."
+# ── Step 7: 啟動/重啟 HTTP server ────────────────────────────────
+log "Step 7/7: 重啟 HTTP 報告伺服器（port $HTTP_PORT）..."
 
 # 停止舊的 http server
 pkill -f "http.server $HTTP_PORT" 2>/dev/null || true
