@@ -48,13 +48,13 @@ echo "============================================================" >> "$LOG_FIL
 cd "$PROJ_DIR"
 
 # ── Step 1: git pull ──────────────────────────────────────────────
-log "Step 1/7: git pull 最新程式碼..."
+log "Step 1/8: git pull 最新程式碼..."
 export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 git pull --ff-only 2>&1 | tee -a "$LOG_FILE" || warn "git pull 失敗，繼續使用現有版本"
 ok "程式碼版本: $(git log --oneline -1)"
 
 # ── Step 2: 清除舊的 allure results（保留 history 供 TREND 使用）──────────
-log "Step 2/7: 清除舊的 allure-results（保留 history 供 TREND 使用）..."
+log "Step 2/8: 清除舊的 allure-results（保留 history 供 TREND 使用）..."
 
 # 先把上次報告的 history 備份出來
 HISTORY_BACKUP="/tmp/allure-history-backup-$$"
@@ -84,7 +84,7 @@ fi
 # 沒有 bridge → wan_a_in/wan_b_in 收到的封包不會 forward 到 lan_a_out/lan_b_out
 # → tester 整個測試環境連通中斷。
 # 這一步在 pytest 之前確保 bridge 處於 forwarding 狀態。
-log "Step 3/7: 檢查 NetEmu bridge 狀態..."
+log "Step 3/8: 檢查 NetEmu bridge 狀態..."
 
 check_netemu_bridge_up() {
   # 回傳 "UP"、"DOWN"、或 "ERROR"
@@ -137,7 +137,7 @@ else
 fi
 
 # ── Step 4: 執行 pytest ───────────────────────────────────────────
-log "Step 4/7: 執行全套測試（74 項，預計 ~3.5 小時）..."
+log "Step 4/8: 執行全套測試（74 項，預計 ~3.5 小時）..."
 PYTEST_EXIT=0
 PYTHONPATH="$PROJ_DIR/src:${PYTHONPATH:-}" \
 $PYTHON -m pytest \
@@ -166,7 +166,7 @@ else
 fi
 
 # ── Step 5: 生成 Allure HTML 報告 ────────────────────────────────
-log "Step 5/7: 生成 Allure HTML 報告..."
+log "Step 5/8: 生成 Allure HTML 報告..."
 if command -v allure &>/dev/null; then
   allure generate "$PROJ_DIR/allure-results" \
     -o "$PROJ_DIR/allure-report" \
@@ -186,7 +186,7 @@ else
 fi
 
 # ── Step 6: 生成 Word 報告 ────────────────────────────────────────
-log "Step 6/7: 生成 Word 測試報告..."
+log "Step 6/8: 生成 Word 測試報告..."
 WORD_EXIT=0
 PYTHONPATH="$PROJ_DIR/src:${PYTHONPATH:-}" \
 $PYTHON scripts/generate_test_report.py \
@@ -203,7 +203,7 @@ else
 fi
 
 # ── Step 7: 啟動/重啟 HTTP server ────────────────────────────────
-log "Step 7/7: 重啟 HTTP 報告伺服器（port $HTTP_PORT）..."
+log "Step 7/8: 重啟 HTTP 報告伺服器（port $HTTP_PORT）..."
 
 # 停止舊的 http server
 pkill -f "http.server $HTTP_PORT" 2>/dev/null || true
@@ -259,9 +259,31 @@ else
   warn "Word 報告位置：$REPORT_DOCX"
 fi
 
+# ── Step 8: Auto-switch vs 固定模式比較（Group B 網路劣化，同 seed）────────
+# NetEmu variation 已用 NETEMU_VARIATION_SEED 鎖定 → 每個劣化條件重播「完全相同」
+# 的劣化,所以這一輪 auto-switch 與上面每日固定模式跑的劣化一致,可公平對照。
+# 只跑 Group B（網路劣化）條件;失敗不影響每日測試結果。
+log "Step 8/8: Auto-switch vs 固定模式比較（Group B 網路劣化，seed 鎖定）..."
+AB_MD="$REPORTS_DIR/autoswitch_${TODAY}.md"
+AB_JSON="$REPORTS_DIR/autoswitch_${TODAY}.json"
+AB_EXIT=0
+PYTHONPATH="$PROJ_DIR/src:${PYTHONPATH:-}" \
+$PYTHON scripts/run_autoswitch_degradation.py \
+  --duration 120 \
+  --output "$AB_JSON" \
+  --report "$AB_MD" 2>&1 | tee -a "$LOG_FILE" || AB_EXIT=$?
+if [ "$AB_EXIT" -eq 0 ]; then
+  ok "Auto-switch 比較完成：$(basename $AB_MD)"
+  [ -d "$HTTP_ROOT" ] && cp "$AB_MD" "$HTTP_ROOT/" 2>/dev/null || true
+else
+  warn "Auto-switch 比較失敗（exit $AB_EXIT，不影響每日測試結果）"
+fi
+
 # ── 保留最近 30 天的 log 和報告 ──────────────────────────────────
 find "$LOG_DIR" -name "test_run_*.log" -mtime +30 -delete 2>/dev/null || true
 find "$REPORTS_DIR" -name "doublink_test_report_*.docx" -mtime +30 -delete 2>/dev/null || true
+find "$REPORTS_DIR" -name "autoswitch_*.md" -mtime +30 -delete 2>/dev/null || true
+find "$REPORTS_DIR" -name "autoswitch_*.json" -mtime +30 -delete 2>/dev/null || true
 ok "舊日誌清理完成（保留 30 天）"
 
 # ── 結束摘要 ─────────────────────────────────────────────────────
